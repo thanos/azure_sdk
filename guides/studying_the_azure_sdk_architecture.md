@@ -68,6 +68,6 @@ Compare with `SharedKey.string_to_sign/2`.
 
 ## Further Reading
 
-- `plans/azure-sdk-study.md`
-- `plans/pipeline-design.md`
+- [`plans/azure-sdk-study.md`](https://github.com/thanos/ex_azure/blob/main/plans/azure-sdk-study.md)
+- [`plans/pipeline-design.md`](https://github.com/thanos/ex_azure/blob/main/plans/pipeline-design.md)
 - [Azure SDK GitHub](https://github.com/Azure/azure-sdk-for-python)

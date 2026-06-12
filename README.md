@@ -74,11 +74,11 @@ See `plans/architecture.md` for the full design.
 
 | Resource | Location |
 |----------|----------|
-| Architecture plans | `plans/` |
-| Educational guides | `guides/` |
-| Livebooks | `livebooks/` |
-| Changelog | `CHANGELOG.md` |
-| Roadmap | `plans/roadmap.md` |
+| API reference and guides | [hexdocs.pm/ex_azure](https://hexdocs.pm/ex_azure) |
+| Architecture plans | [`plans/`](https://github.com/thanos/ex_azure/tree/main/plans) |
+| Livebooks | [`livebooks/`](https://github.com/thanos/ex_azure/tree/main/livebooks) |
+| Changelog | [`CHANGELOG.md`](https://github.com/thanos/ex_azure/blob/main/CHANGELOG.md) |
+| Roadmap | [`plans/roadmap.md`](https://github.com/thanos/ex_azure/blob/main/plans/roadmap.md) |
 
 ## Telemetry
 

@@ -91,6 +91,6 @@ Architecture transfers; signing and parsers change per cloud.
 
 ## Further Reading
 
-- `plans/architecture.md`
+- [`plans/architecture.md`](https://github.com/thanos/ex_azure/blob/main/plans/architecture.md)
 - `guides/building_sdk_pipelines_with_req.md`
 - `guides/telemetry_driven_sdk_design.md`

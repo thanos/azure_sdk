@@ -11,7 +11,7 @@
 - Azurite-first CI
 - Explicit credentials; OAuth in v0.2.0
 
-See `plans/azurex-review.md` for details.
+See [`plans/azurex-review.md`](https://github.com/thanos/ex_azure/blob/main/plans/azurex-review.md) for details.
 
 ## Dependency
 
@@ -110,4 +110,4 @@ Double-account signing handled automatically.
 ## Further Reading
 
 - `guides/azure_for_elixir_developers.md`
-- `livebooks/getting_started.livemd`
+- [`livebooks/getting_started.livemd`](https://github.com/thanos/ex_azure/blob/main/livebooks/getting_started.livemd)

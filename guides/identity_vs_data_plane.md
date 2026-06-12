@@ -74,6 +74,6 @@ Steps 1–2 via Portal/CLI/Terraform today.
 
 ## Further Reading
 
-- `plans/data-plane-vs-management-plane.md`
-- `plans/identity-architecture.md`
+- [`plans/data-plane-vs-management-plane.md`](https://github.com/thanos/ex_azure/blob/main/plans/data-plane-vs-management-plane.md)
+- [`plans/identity-architecture.md`](https://github.com/thanos/ex_azure/blob/main/plans/identity-architecture.md)
 - `guides/management_plane_design.md`

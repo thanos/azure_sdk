@@ -84,6 +84,6 @@ Unlike Azurite for data plane, management needs:
 
 ## Further Reading
 
-- `plans/data-plane-vs-management-plane.md`
-- `plans/identity-architecture.md`
-- `plans/roadmap.md`
+- [`plans/data-plane-vs-management-plane.md`](https://github.com/thanos/ex_azure/blob/main/plans/data-plane-vs-management-plane.md)
+- [`plans/identity-architecture.md`](https://github.com/thanos/ex_azure/blob/main/plans/identity-architecture.md)
+- [`plans/roadmap.md`](https://github.com/thanos/ex_azure/blob/main/plans/roadmap.md)

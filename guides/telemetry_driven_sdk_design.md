@@ -79,6 +79,6 @@ System.convert_time_unit(d, :native, :millisecond)
 
 ## Further Reading
 
-- `plans/telemetry-design.md`
-- `livebooks/telemetry.livemd`
+- [`plans/telemetry-design.md`](https://github.com/thanos/ex_azure/blob/main/plans/telemetry-design.md)
+- [`livebooks/telemetry.livemd`](https://github.com/thanos/ex_azure/blob/main/livebooks/telemetry.livemd)
 - [Telemetry hexdocs](https://hexdocs.pm/telemetry/)

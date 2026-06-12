@@ -88,6 +88,6 @@ end, nil)
 
 ## Next Steps
 
-- `livebooks/getting_started.livemd`
+- [`livebooks/getting_started.livemd`](https://github.com/thanos/ex_azure/blob/main/livebooks/getting_started.livemd)
 - `guides/identity_vs_data_plane.md`
 - `guides/migrating_from_azurex.md`

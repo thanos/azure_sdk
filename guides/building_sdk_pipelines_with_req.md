@@ -89,6 +89,6 @@ Integration tests hit Azurite.
 
 ## Further Reading
 
-- `plans/pipeline-design.md`
-- `plans/req-integration.md`
+- [`plans/pipeline-design.md`](https://github.com/thanos/ex_azure/blob/main/plans/pipeline-design.md)
+- [`plans/req-integration.md`](https://github.com/thanos/ex_azure/blob/main/plans/req-integration.md)
 - `guides/designing_cloud_sdks_on_the_beam.md`

@@ -70,7 +70,38 @@ defmodule ExAzure.MixProject do
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", "CHANGELOG.md"],
+      extras: [
+        "README.md",
+        "CHANGELOG.md",
+        "guides/azure_for_elixir_developers.md",
+        "guides/identity_vs_data_plane.md",
+        "guides/migrating_from_azurex.md",
+        "guides/telemetry_driven_sdk_design.md",
+        "guides/building_sdk_pipelines_with_req.md",
+        "guides/designing_cloud_sdks_on_the_beam.md",
+        "guides/studying_the_azure_sdk_architecture.md",
+        "guides/management_plane_design.md"
+      ],
+      groups_for_extras: [
+        "Using ExAzure": [
+          "guides/azure_for_elixir_developers.md",
+          "guides/identity_vs_data_plane.md",
+          "guides/migrating_from_azurex.md",
+          "guides/telemetry_driven_sdk_design.md"
+        ],
+        "Design & Internals": [
+          "guides/building_sdk_pipelines_with_req.md",
+          "guides/designing_cloud_sdks_on_the_beam.md",
+          "guides/studying_the_azure_sdk_architecture.md",
+          "guides/management_plane_design.md"
+        ]
+      ],
+      groups_for_modules: [
+        Identity: [~r/^ExAzure\.Identity\./],
+        Storage: [~r/^ExAzure\.Storage\./],
+        Core: [~r/^ExAzure\.Core\./, ExAzure.Error],
+        Pipeline: [~r/^ExAzure\.Pipeline\./]
+      ],
       source_url: @source_url,
       source_ref: "v#{@version}"
     ]
