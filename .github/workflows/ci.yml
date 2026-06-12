@@ -130,3 +130,35 @@ jobs:
           key: ${{ runner.os }}-mix-docs-${{ hashFiles('**/mix.lock') }}
       - run: mix deps.get
       - run: mix docs
+
+  coveralls:
+    name: Coveralls
+    runs-on: ubuntu-latest
+    services:
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+          - 10000:10000
+          - 10001:10001
+          - 10002:10002
+    env:
+      MIX_ENV: test
+      AZURITE: "true"
+      PROPERTY: "true"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: erlef/setup-beam@v1.2.0
+        with:
+          otp-version: "28"
+          elixir-version: "1.20"
+      - name: Cache deps
+        uses: actions/cache@v4.2.3
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-coveralls-${{ hashFiles('**/mix.lock') }}
+      - run: mix deps.get
+      - run: mix coveralls.github

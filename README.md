@@ -1,5 +1,11 @@
 # ExAzure
 
+[![Hex.pm](https://img.shields.io/hexpm/v/ex_azure.svg)](https://hex.pm/packages/ex_azure)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/ex_azure)
+[![CI](https://github.com/thanos/ex_azure/actions/workflows/ci.yml/badge.svg)](https://github.com/thanos/ex_azure/actions/workflows/ci.yml)
+[![Coverage Status](https://coveralls.io/repos/github/thanos/ex_azure/badge.svg?branch=main)](https://coveralls.io/github/thanos/ex_azure?branch=main)
+[![License](https://img.shields.io/hexpm/l/ex_azure.svg)](https://github.com/thanos/ex_azure/blob/main/LICENSE)
+
 Azure platform SDK for Elixir and Erlang.
 
 ExAzure is not a Blob Storage library. It is a long-term, multi-service Azure SDK built on BEAM-native patterns: explicit client structs, OTP-ready design, first-class telemetry, and a reusable Req pipeline.
