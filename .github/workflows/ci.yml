@@ -10,20 +10,21 @@ on:
 # 1.19      → OTP 27–28
 # 1.20      → OTP 27–29
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   quality:
     name: Quality
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.3
       - uses: erlef/setup-beam@v1.24.0
         with:
           otp-version: "28"
           elixir-version: "1.20"
       - name: Cache deps
-        uses: actions/cache@v4.2.3
+        uses: actions/cache@v5.0.5
         with:
           path: |
             deps
@@ -37,22 +38,21 @@ jobs:
 
   dialyzer:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.3
       - uses: erlef/setup-beam@v1.24.0
         with:
           otp-version: "28"
           elixir-version: "1.19"
       - name: Cache deps
-        uses: actions/cache@v4.2.3
+        uses: actions/cache@v5.0.5
         with:
           path: |
             deps
             _build
           key: ${{ runner.os }}-mix-dialyzer-${{ hashFiles('**/mix.lock') }}
       - run: mix deps.get
+      - run: rm -f priv/plts/project.plt
       - run: mix dialyzer
 
   test:
@@ -86,15 +86,14 @@ jobs:
     env:
       AZURITE: "true"
       PROPERTY: "true"
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.3
       - uses: erlef/setup-beam@v1.24.0
         with:
           otp-version: ${{ matrix.otp }}
           elixir-version: ${{ matrix.elixir }}
       - name: Cache deps
-        uses: actions/cache@v4.2.3
+        uses: actions/cache@v5.0.5
         with:
           path: |
             deps
@@ -105,24 +104,20 @@ jobs:
 
   livebooks:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.3
       - run: ./scripts/validate_livebooks.sh
 
   docs:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.3
       - uses: erlef/setup-beam@v1.24.0
         with:
           otp-version: "28"
           elixir-version: "1.20"
       - name: Cache deps
-        uses: actions/cache@v4.2.3
+        uses: actions/cache@v5.0.5
         with:
           path: |
             deps
@@ -145,16 +140,15 @@ jobs:
       MIX_ENV: test
       AZURITE: "true"
       PROPERTY: "true"
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.3
       - uses: erlef/setup-beam@v1.24.0
         with:
           otp-version: "28"
           elixir-version: "1.20"
       - name: Cache deps
-        uses: actions/cache@v4.2.3
+        uses: actions/cache@v5.0.5
         with:
           path: |
             deps

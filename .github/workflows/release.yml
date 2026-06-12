@@ -28,7 +28,7 @@ jobs:
       AZURITE: "true"
       PROPERTY: "true"
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.3
 
       - uses: erlef/setup-beam@v1.24.0
         with:
@@ -36,7 +36,7 @@ jobs:
           otp-version: ${{ env.OTP_VERSION }}
 
       - name: Cache dependencies
-        uses: actions/cache@v4.2.3
+        uses: actions/cache@v5.0.5
         with:
           path: |
             deps
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [publish-hex]
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
@@ -111,7 +111,7 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2.2.1
+        uses: softprops/action-gh-release@v3.0.0
         with:
           name: v${{ steps.version.outputs.version }}
           body_path: ${{ steps.notes.outputs.path }}
