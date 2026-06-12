@@ -1,0 +1,38 @@
+# Authentication with ExAzure
+
+```elixir
+Mix.install([
+  {:ex_azure, path: "."},
+  {:req, "~> 0.5"},
+  {:sweet_xml, "~> 0.7"},
+  {:telemetry, "~> 1.3"}
+])
+```
+
+## Shared Key
+
+```elixir
+shared_key =
+  ExAzure.Identity.SharedKeyCredential.new(
+    "devstoreaccount1",
+    "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+  )
+
+client =
+  ExAzure.Storage.Client.new(
+    account: "devstoreaccount1",
+    credential: shared_key,
+    endpoint: "http://127.0.0.1:10000/devstoreaccount1"
+  )
+
+{:ok, containers} = ExAzure.Storage.Container.list(client)
+length(containers)
+```
+
+## SAS credential
+
+```elixir
+# SAS tokens are applied as query parameters by ExAzure.Pipeline.SAS
+sas = ExAzure.Identity.SASCredential.new("sv=2021-06-08&ss=b&srt=sco&sp=rwdlacup&se=2030-01-01T00:00:00Z&sig=example")
+sas.params["sv"]
+```

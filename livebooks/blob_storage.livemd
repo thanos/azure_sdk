@@ -1,0 +1,36 @@
+# Blob Storage with ExAzure
+
+```elixir
+Mix.install([
+  {:ex_azure, path: "."},
+  {:req, "~> 0.5"},
+  {:sweet_xml, "~> 0.7"},
+  {:telemetry, "~> 1.3"}
+])
+
+credential =
+  ExAzure.Identity.SharedKeyCredential.new(
+    "devstoreaccount1",
+    "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+  )
+
+client =
+  ExAzure.Storage.Client.new(
+    account: "devstoreaccount1",
+    credential: credential,
+    endpoint: "http://127.0.0.1:10000/devstoreaccount1"
+  )
+
+container = "blob-livebook"
+{:ok, _} = ExAzure.Storage.Container.create(client, container)
+```
+
+## Upload, list, download, delete
+
+```elixir
+{:ok, _} = ExAzure.Storage.Blob.upload(client, container, "notes.txt", "ExAzure blob demo")
+{:ok, blobs} = ExAzure.Storage.Container.list_blobs(client, container)
+{:ok, %{content: content}} = ExAzure.Storage.Blob.download(client, container, "notes.txt")
+{:ok, :deleted} = ExAzure.Storage.Blob.delete(client, container, "notes.txt")
+{content, length(blobs)}
+```
