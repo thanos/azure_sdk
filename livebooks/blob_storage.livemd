@@ -1,33 +1,33 @@
-# Blob Storage with ExAzure
+# Blob Storage with AzureSDK
 
 ```elixir
 Mix.install([
-  {:ex_azure, path: Path.expand("..", __DIR__)}
+  {:azure_sdk, path: Path.expand("..", __DIR__)}
 ])
 
 credential =
-  ExAzure.Identity.SharedKeyCredential.new(
+  AzureSDK.Identity.SharedKeyCredential.new(
     "devstoreaccount1",
     "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
   )
 
 client =
-  ExAzure.Storage.Client.new(
+  AzureSDK.Storage.Client.new(
     account: "devstoreaccount1",
     credential: credential,
     endpoint: "http://127.0.0.1:10000/devstoreaccount1"
   )
 
 container = "blob-livebook"
-{:ok, _} = ExAzure.Storage.Container.create(client, container)
+{:ok, _} = AzureSDK.Storage.Container.create(client, container)
 ```
 
 ## Upload, list, download, delete
 
 ```elixir
-{:ok, _} = ExAzure.Storage.Blob.upload(client, container, "notes.txt", "ExAzure blob demo")
-{:ok, blobs} = ExAzure.Storage.Container.list_blobs(client, container)
-{:ok, %{content: content}} = ExAzure.Storage.Blob.download(client, container, "notes.txt")
-{:ok, :deleted} = ExAzure.Storage.Blob.delete(client, container, "notes.txt")
+{:ok, _} = AzureSDK.Storage.Blob.upload(client, container, "notes.txt", "AzureSDK blob demo")
+{:ok, blobs} = AzureSDK.Storage.Container.list_blobs(client, container)
+{:ok, %{content: content}} = AzureSDK.Storage.Blob.download(client, container, "notes.txt")
+{:ok, :deleted} = AzureSDK.Storage.Blob.delete(client, container, "notes.txt")
 {content, length(blobs)}
 ```

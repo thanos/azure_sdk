@@ -1,31 +1,31 @@
 # Migrating from Azurex
 
-[Azurex](https://github.com/jakobht/azurex) served Elixir Blob Storage needs. ExAzure is the successor platform SDK.
+[Azurex](https://github.com/jakobht/azurex) served Elixir Blob Storage needs. AzureSDK is the successor platform SDK.
 
 ## Why Migrate?
 
 - Platform scope (Queue, Table, Management coming)
 - Built-in `:telemetry`
-- `%ExAzure.Error{}` everywhere
+- `%AzureSDK.Error{}` everywhere
 - Req/Finch instead of HTTPoison
 - Azurite-first CI
 - Explicit credentials; OAuth in v0.2.0
 
-See [`plans/azurex-review.md`](https://github.com/thanos/ex_azure/blob/main/plans/azurex-review.md) for details.
+See [`plans/azurex-review.md`](https://github.com/thanos/azure_sdk/blob/main/plans/azurex-review.md) for details.
 
 ## Dependency
 
 ```elixir
 # Remove: {:azurex, "~> 1.1"}
 # Add:
-{:ex_azure, "~> 0.1.0"}
+{:azure_sdk, "~> 0.1.0"}
 ```
 
 ## Client Setup
 
 **Azurex:** config-based or inline keys at call site.
 
-**ExAzure:**
+**AzureSDK:**
 
 ```elixir
 credential = SharedKeyCredential.new(account, key)
@@ -37,7 +37,7 @@ Create client once at startup; pass to all operations.
 
 ## Operation Mapping
 
-| Azurex | ExAzure |
+| Azurex | AzureSDK |
 |--------|---------|
 | `put_blob/4` | `Blob.upload/4` |
 | `get_blob/3` | `Blob.download/3` |
@@ -91,7 +91,7 @@ Storage.Client.new(
 
 Double-account signing handled automatically.
 
-## Not Yet in ExAzure
+## Not Yet in AzureSDK
 
 | Feature | Status |
 |---------|--------|
@@ -101,7 +101,7 @@ Double-account signing handled automatically.
 
 ## Incremental Strategy
 
-1. Add `ex_azure` alongside `azurex`
+1. Add `azure_sdk` alongside `azurex`
 2. Create client in context module
 3. Migrate one operation at a time
 4. Add telemetry handlers
@@ -110,4 +110,4 @@ Double-account signing handled automatically.
 ## Further Reading
 
 - `guides/azure_for_elixir_developers.md`
-- [`livebooks/getting_started.livemd`](https://github.com/thanos/ex_azure/blob/main/livebooks/getting_started.livemd)
+- [`livebooks/getting_started.livemd`](https://github.com/thanos/azure_sdk/blob/main/livebooks/getting_started.livemd)

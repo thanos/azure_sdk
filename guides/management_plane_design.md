@@ -1,6 +1,6 @@
 # Management Plane Design
 
-How ExAzure will implement Azure Resource Manager clients. Planned for **v0.5.0**; v0.1.0 has stubs.
+How AzureSDK will implement Azure Resource Manager clients. Planned for **v0.5.0**; v0.1.0 has stubs.
 
 ## What Is the Management Plane?
 
@@ -23,7 +23,7 @@ Authorization: Bearer {token}
 Content-Type: application/json
 ```
 
-## ExAzure Client (Planned)
+## AzureSDK Client (Planned)
 
 ```elixir
 mgmt = Management.Client.new(
@@ -51,7 +51,7 @@ ARM returns `202 Accepted`:
 Azure-AsyncOperation: https://management.azure.com/.../status
 ```
 
-`Pipeline.LRO` (planned): poll until `Succeeded` or `Failed`, emit `[:ex_azure, :management, :lro, :poll]`.
+`Pipeline.LRO` (planned): poll until `Succeeded` or `Failed`, emit `[:azure_sdk, :management, :lro, :poll]`.
 
 ## Error Handling
 
@@ -84,6 +84,6 @@ Unlike Azurite for data plane, management needs:
 
 ## Further Reading
 
-- [`plans/data-plane-vs-management-plane.md`](https://github.com/thanos/ex_azure/blob/main/plans/data-plane-vs-management-plane.md)
-- [`plans/identity-architecture.md`](https://github.com/thanos/ex_azure/blob/main/plans/identity-architecture.md)
-- [`plans/roadmap.md`](https://github.com/thanos/ex_azure/blob/main/plans/roadmap.md)
+- [`plans/data-plane-vs-management-plane.md`](https://github.com/thanos/azure_sdk/blob/main/plans/data-plane-vs-management-plane.md)
+- [`plans/identity-architecture.md`](https://github.com/thanos/azure_sdk/blob/main/plans/identity-architecture.md)
+- [`plans/roadmap.md`](https://github.com/thanos/azure_sdk/blob/main/plans/roadmap.md)

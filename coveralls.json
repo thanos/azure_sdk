@@ -3,17 +3,17 @@
     "minimum_coverage": 80
   },
   "skip_files": [
-    "lib/ex_azure/core/client.ex",
-    "lib/ex_azure/integrations/",
-    "lib/ex_azure/management/",
-    "lib/ex_azure/storage/data_lake.ex",
-    "lib/ex_azure/storage/file_share.ex",
-    "lib/ex_azure/storage/queue.ex",
-    "lib/ex_azure/storage/table.ex",
-    "lib/ex_azure/identity/client_secret_credential.ex",
-    "lib/ex_azure/identity/default_azure_credential.ex",
-    "lib/ex_azure/identity/managed_identity_credential.ex",
-    "lib/ex_azure/identity/token_cache.ex",
-    "lib/ex_azure/management/client.ex"
+    "lib/azure_sdk/core/client.ex",
+    "lib/azure_sdk/integrations/",
+    "lib/azure_sdk/management/",
+    "lib/azure_sdk/storage/data_lake.ex",
+    "lib/azure_sdk/storage/file_share.ex",
+    "lib/azure_sdk/storage/queue.ex",
+    "lib/azure_sdk/storage/table.ex",
+    "lib/azure_sdk/identity/client_secret_credential.ex",
+    "lib/azure_sdk/identity/default_azure_credential.ex",
+    "lib/azure_sdk/identity/managed_identity_credential.ex",
+    "lib/azure_sdk/identity/token_cache.ex",
+    "lib/azure_sdk/management/client.ex"
   ]
 }

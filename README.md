@@ -1,14 +1,14 @@
-# ExAzure
+# Azure SDK
 
-[![Hex.pm](https://img.shields.io/hexpm/v/ex_azure.svg)](https://hex.pm/packages/ex_azure)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/ex_azure)
-[![CI](https://github.com/thanos/ex_azure/actions/workflows/ci.yml/badge.svg)](https://github.com/thanos/ex_azure/actions/workflows/ci.yml)
-[![Coverage Status](https://coveralls.io/repos/github/thanos/ex_azure/badge.svg?branch=main)](https://coveralls.io/github/thanos/ex_azure?branch=main)
-[![License](https://img.shields.io/hexpm/l/ex_azure.svg)](https://github.com/thanos/ex_azure/blob/main/LICENSE)
+[![Hex.pm](https://img.shields.io/hexpm/v/azure_sdk.svg)](https://hex.pm/packages/azure_sdk)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/azure_sdk)
+[![CI](https://github.com/thanos/azure_sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/thanos/azure_sdk/actions/workflows/ci.yml)
+[![Coverage Status](https://coveralls.io/repos/github/thanos/azure_sdk/badge.svg?branch=main)](https://coveralls.io/github/thanos/azure_sdk?branch=main)
+[![License](https://img.shields.io/hexpm/l/azure_sdk.svg)](https://github.com/thanos/azure_sdk/blob/main/LICENSE)
 
 Azure platform SDK for Elixir and Erlang.
 
-ExAzure is not a Blob Storage library. It is a long-term, multi-service Azure SDK built on BEAM-native patterns: explicit client structs, OTP-ready design, first-class telemetry, and a reusable Req pipeline.
+AzureSDK is not a Blob Storage library. It is a long-term, multi-service Azure SDK built on BEAM-native patterns: explicit client structs, OTP-ready design, first-class telemetry, and a reusable Req pipeline.
 
 **v0.1.0** ships Blob Storage on top of the foundation. Queue, Table, Management, and BEAM integrations are architected from day one.
 
@@ -17,7 +17,7 @@ ExAzure is not a Blob Storage library. It is a long-term, multi-service Azure SD
 ```elixir
 def deps do
   [
-    {:ex_azure, "~> 0.1.0"}
+    {:azure_sdk, "~> 0.1.0"}
   ]
 end
 ```
@@ -26,19 +26,19 @@ end
 
 ```elixir
 credential =
-  ExAzure.Identity.SharedKeyCredential.new(
+  AzureSDK.Identity.SharedKeyCredential.new(
     "myaccount",
     System.fetch_env!("AZURE_STORAGE_KEY")
   )
 
 client =
-  ExAzure.Storage.Client.new(
+  AzureSDK.Storage.Client.new(
     account: "myaccount",
     credential: credential
   )
 
-{:ok, _} = ExAzure.Storage.Container.create(client, "uploads")
-{:ok, blob} = ExAzure.Storage.Blob.upload(client, "uploads", "hello.txt", "Hello, Azure!")
+{:ok, _} = AzureSDK.Storage.Container.create(client, "uploads")
+{:ok, blob} = AzureSDK.Storage.Blob.upload(client, "uploads", "hello.txt", "Hello, Azure!")
 ```
 
 ### Local development with Azurite
@@ -49,10 +49,10 @@ docker compose up -d
 
 ```elixir
 client =
-  ExAzure.Storage.Client.new(
+  AzureSDK.Storage.Client.new(
     account: "devstoreaccount1",
     credential:
-      ExAzure.Identity.SharedKeyCredential.new(
+      AzureSDK.Identity.SharedKeyCredential.new(
         "devstoreaccount1",
         "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
       ),
@@ -67,7 +67,7 @@ AZURITE=true mix test
 ## Architecture
 
 ```
-ExAzure
+AzureSDK
 ├── Identity Plane      (SharedKey, SAS; OAuth planned v0.2)
 ├── Data Plane          (Blob v0.1; Queue, Table, File, Data Lake stubbed)
 ├── Management Plane    (stubbed for v0.5)
@@ -80,18 +80,18 @@ See `plans/architecture.md` for the full design.
 
 | Resource | Location |
 |----------|----------|
-| API reference and guides | [hexdocs.pm/ex_azure](https://hexdocs.pm/ex_azure) |
-| Architecture plans | [`plans/`](https://github.com/thanos/ex_azure/tree/main/plans) |
-| Livebooks | [`livebooks/`](https://github.com/thanos/ex_azure/tree/main/livebooks) |
-| Changelog | [`CHANGELOG.md`](https://github.com/thanos/ex_azure/blob/main/CHANGELOG.md) |
-| Roadmap | [`plans/roadmap.md`](https://github.com/thanos/ex_azure/blob/main/plans/roadmap.md) |
+| API reference and guides | [hexdocs.pm/azure_sdk](https://hexdocs.pm/azure_sdk) |
+| Architecture plans | [`plans/`](https://github.com/thanos/azure_sdk/tree/main/plans) |
+| Livebooks | [`livebooks/`](https://github.com/thanos/azure_sdk/tree/main/livebooks) |
+| Changelog | [`CHANGELOG.md`](https://github.com/thanos/azure_sdk/blob/main/CHANGELOG.md) |
+| Roadmap | [`plans/roadmap.md`](https://github.com/thanos/azure_sdk/blob/main/plans/roadmap.md) |
 
 ## Telemetry
 
 Every operation emits `:telemetry` events:
 
 ```elixir
-:telemetry.attach("ex-azure", [:ex_azure, :request, :stop], fn _, %{duration: d}, meta, _ ->
+:telemetry.attach("ex-azure", [:azure_sdk, :request, :stop], fn _, %{duration: d}, meta, _ ->
   IO.inspect({d, meta})
 end, nil)
 ```

@@ -1,40 +1,40 @@
-# Buffered enumerables with ExAzure
+# Buffered enumerables with AzureSDK
 
 In v0.1.0, `upload_stream/4` and `download_stream/4` accept enumerables but buffer
 content in memory. Chunked streaming is planned for a future release.
 
 ```elixir
 Mix.install([
-  {:ex_azure, path: Path.expand("..", __DIR__)}
+  {:azure_sdk, path: Path.expand("..", __DIR__)}
 ])
 
 credential =
-  ExAzure.Identity.SharedKeyCredential.new(
+  AzureSDK.Identity.SharedKeyCredential.new(
     "devstoreaccount1",
     "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
   )
 
 client =
-  ExAzure.Storage.Client.new(
+  AzureSDK.Storage.Client.new(
     account: "devstoreaccount1",
     credential: credential,
     endpoint: "http://127.0.0.1:10000/devstoreaccount1"
   )
 
 container = "stream-demo"
-{:ok, _} = ExAzure.Storage.Container.create(client, container)
+{:ok, _} = AzureSDK.Storage.Container.create(client, container)
 ```
 
 ## Stream upload
 
 ```elixir
 stream = Stream.repeatedly(fn -> "chunk" end) |> Stream.take(3)
-{:ok, _} = ExAzure.Storage.Blob.upload_stream(client, container, "chunks.bin", stream)
+{:ok, _} = AzureSDK.Storage.Blob.upload_stream(client, container, "chunks.bin", stream)
 ```
 
 ## Stream download
 
 ```elixir
-{:ok, stream} = ExAzure.Storage.Blob.download_stream(client, container, "chunks.bin")
+{:ok, stream} = AzureSDK.Storage.Blob.download_stream(client, container, "chunks.bin")
 stream |> Enum.join()
 ```

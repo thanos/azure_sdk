@@ -1,6 +1,6 @@
 # Designing Cloud SDKs on the BEAM
 
-Architectural patterns from ExAzure that apply to any HTTP-based cloud SDK.
+Architectural patterns from AzureSDK that apply to any HTTP-based cloud SDK.
 
 ## BEAM Advantages
 
@@ -58,7 +58,7 @@ Azurite (Azure), LocalStack (AWS), fake-gcs-server (GCP).
 Ship stubs on day one:
 
 ```elixir
-defmodule ExAzure.Storage.Queue do
+defmodule AzureSDK.Storage.Queue do
   @moduledoc "Planned v0.3.0."
 end
 ```
@@ -85,12 +85,12 @@ end
 | Signing | HMAC-SHA256 | SigV4 |
 | Pipeline | Core.Pipeline | Same pattern |
 | Emulator | Azurite | LocalStack |
-| Events | `[:ex_azure, ...]` | `[:ex_aws, ...]` |
+| Events | `[:azure_sdk, ...]` | `[:ex_aws, ...]` |
 
 Architecture transfers; signing and parsers change per cloud.
 
 ## Further Reading
 
-- [`plans/architecture.md`](https://github.com/thanos/ex_azure/blob/main/plans/architecture.md)
+- [`plans/architecture.md`](https://github.com/thanos/azure_sdk/blob/main/plans/architecture.md)
 - `guides/building_sdk_pipelines_with_req.md`
 - `guides/telemetry_driven_sdk_design.md`

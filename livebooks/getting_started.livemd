@@ -1,8 +1,8 @@
-# Getting Started with ExAzure
+# Getting Started with AzureSDK
 
 ```elixir
 Mix.install([
-  {:ex_azure, path: Path.expand("..", __DIR__)}
+  {:azure_sdk, path: Path.expand("..", __DIR__)}
 ])
 ```
 
@@ -18,13 +18,13 @@ docker compose up -d
 
 ```elixir
 credential =
-  ExAzure.Identity.SharedKeyCredential.new(
+  AzureSDK.Identity.SharedKeyCredential.new(
     "devstoreaccount1",
     "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
   )
 
 client =
-  ExAzure.Storage.Client.new(
+  AzureSDK.Storage.Client.new(
     account: "devstoreaccount1",
     credential: credential,
     endpoint: "http://127.0.0.1:10000/devstoreaccount1"
@@ -36,7 +36,7 @@ client =
 ```elixir
 container = "livebook-demo"
 
-{:ok, _} = ExAzure.Storage.Container.create(client, container)
-{:ok, blob} = ExAzure.Storage.Blob.upload(client, container, "hello.txt", "Hello from Livebook!")
+{:ok, _} = AzureSDK.Storage.Container.create(client, container)
+{:ok, blob} = AzureSDK.Storage.Blob.upload(client, container, "hello.txt", "Hello from Livebook!")
 blob.name
 ```

@@ -1,6 +1,6 @@
 # Studying the Azure SDK Architecture
 
-Microsoft's Azure SDKs share a common architecture. Understanding it helps you contribute to ExAzure.
+Microsoft's Azure SDKs share a common architecture. Understanding it helps you contribute to AzureSDK.
 
 ## Hierarchy
 
@@ -8,7 +8,7 @@ Microsoft's Azure SDKs share a common architecture. Understanding it helps you c
 Service Client → Pipeline/Policies → HTTP
 ```
 
-ExAzure mapping:
+AzureSDK mapping:
 
 ```
 Storage.Blob.upload/4 → Core.Pipeline.run/3 → Req.request/1
@@ -28,9 +28,9 @@ Source of truth: methods, headers (`x-ms-version`, `x-ms-date`), auth scheme, bo
 
 Most readable reference. Study `azure-storage-blob` for client construction, signing, pagination.
 
-### 4. Map Policies to ExAzure
+### 4. Map Policies to AzureSDK
 
-| Azure Core | ExAzure |
+| Azure Core | AzureSDK |
 |------------|---------|
 | `BearerTokenCredentialPolicy` | Future `Pipeline.Bearer` |
 | `RetryPolicy` | `Core.Retry` |
@@ -62,12 +62,12 @@ Capture auth, parsing, pagination, errors, telemetry in `plans/` before code.
 
 **Python:** `BlobClient.upload_blob()` → pipeline → `SharedKeyCredentialPolicy` → transport
 
-**ExAzure:** `Blob.upload/4` → `Pipeline.run` → `SharedKey.apply` → `Req.request`
+**AzureSDK:** `Blob.upload/4` → `Pipeline.run` → `SharedKey.apply` → `Req.request`
 
 Compare with `SharedKey.string_to_sign/2`.
 
 ## Further Reading
 
-- [`plans/azure-sdk-study.md`](https://github.com/thanos/ex_azure/blob/main/plans/azure-sdk-study.md)
-- [`plans/pipeline-design.md`](https://github.com/thanos/ex_azure/blob/main/plans/pipeline-design.md)
+- [`plans/azure-sdk-study.md`](https://github.com/thanos/azure_sdk/blob/main/plans/azure-sdk-study.md)
+- [`plans/pipeline-design.md`](https://github.com/thanos/azure_sdk/blob/main/plans/pipeline-design.md)
 - [Azure SDK GitHub](https://github.com/Azure/azure-sdk-for-python)

@@ -1,19 +1,19 @@
-defmodule ExAzure.AzureMockCase do
+defmodule AzureSDK.AzureMockCase do
   @moduledoc false
 
   use ExUnit.CaseTemplate
 
   using do
     quote do
-      import ExAzure.AzureMockCase
-      alias ExAzure.AzureMock
+      import AzureSDK.AzureMockCase
+      alias AzureSDK.AzureMock
     end
   end
 
   setup do
     bypass = Bypass.open()
-    client = ExAzure.AzureMock.client(bypass)
+    client = AzureSDK.AzureMock.client(bypass)
 
-    {:ok, bypass: bypass, client: client, account: ExAzure.AzureMock.account()}
+    {:ok, bypass: bypass, client: client, account: AzureSDK.AzureMock.account()}
   end
 end

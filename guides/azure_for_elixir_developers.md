@@ -4,7 +4,7 @@ Azure Storage concepts for Elixir developers new to the platform.
 
 ## Key Terms
 
-| Azure Term | Analogy | ExAzure Module |
+| Azure Term | Analogy | AzureSDK Module |
 |------------|---------|----------------|
 | Storage Account | S3 account namespace | `Storage.Client` |
 | Container | S3 bucket | `Storage.Container` |
@@ -23,7 +23,7 @@ client = Storage.Client.new(account: "myaccount", credential: credential)
 {:ok, blob} = Blob.upload(client, "uploads", "hello.txt", "Hello, Azure!")
 ```
 
-Every step returns `{:ok, result}` or `{:error, %ExAzure.Error{}}`.
+Every step returns `{:ok, result}` or `{:error, %AzureSDK.Error{}}`.
 
 ## Local Development with Azurite
 
@@ -64,17 +64,17 @@ case Blob.download(client, "uploads", "missing.txt") do
 end
 ```
 
-`%ExAzure.Error{}` has `status`, `code`, `message`, `request_id`, `service`.
+`%AzureSDK.Error{}` has `status`, `code`, `message`, `request_id`, `service`.
 
 ## Telemetry
 
 ```elixir
-:telemetry.attach("app", [:ex_azure, :blob, :put], fn _, _, %{container: c, name: n}, _ ->
+:telemetry.attach("app", [:azure_sdk, :blob, :put], fn _, _, %{container: c, name: n}, _ ->
   Logger.info("Uploaded #{c}/#{n}")
 end, nil)
 ```
 
-## What ExAzure Is
+## What AzureSDK Is
 
 - Platform SDK for Azure on the BEAM (Blob today, more coming)
 - Req transport, telemetry, retry, standardized errors
@@ -88,6 +88,6 @@ end, nil)
 
 ## Next Steps
 
-- [`livebooks/getting_started.livemd`](https://github.com/thanos/ex_azure/blob/main/livebooks/getting_started.livemd)
+- [`livebooks/getting_started.livemd`](https://github.com/thanos/azure_sdk/blob/main/livebooks/getting_started.livemd)
 - `guides/identity_vs_data_plane.md`
 - `guides/migrating_from_azurex.md`
