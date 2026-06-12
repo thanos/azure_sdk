@@ -19,6 +19,7 @@ defmodule ExAzure.Identity.ManagedIdentityCredential do
   end
 
   @impl ExAzure.Identity.Credential
+  @dialyzer {:nowarn_function, sign_request: 2}
   def sign_request(%__MODULE__{}, _request) do
     raise ArgumentError,
           "ManagedIdentityCredential is not implemented in v0.1.0. See plans/identity-architecture.md"

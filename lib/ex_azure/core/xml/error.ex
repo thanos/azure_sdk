@@ -3,8 +3,14 @@ defmodule ExAzure.Core.Xml.Error do
 
   import SweetXml
 
+  @type parsed :: %{
+          optional(:code) => String.t() | nil,
+          optional(:message) => String.t() | nil,
+          optional(:details) => map()
+        }
+
   @doc false
-  @spec parse(binary() | nil) :: map()
+  @spec parse(binary() | nil) :: parsed()
   def parse(nil), do: %{}
   def parse(""), do: %{}
 

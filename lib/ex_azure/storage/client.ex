@@ -71,7 +71,7 @@ defmodule ExAzure.Storage.Client do
   @doc """
   Metadata passed to the signing pipeline for storage requests.
   """
-  @spec signing_metadata(t()) :: map()
+  @spec signing_metadata(t()) :: %{api_version: String.t(), emulator: boolean()}
   def signing_metadata(%__MODULE__{} = client) do
     %{api_version: client.api_version, emulator: emulator?(client)}
   end

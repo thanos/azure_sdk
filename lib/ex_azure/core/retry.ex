@@ -17,7 +17,11 @@ defmodule ExAzure.Core.Retry do
   @doc """
   Returns the default retry policy.
   """
-  @spec default_policy() :: policy()
+  @spec default_policy() :: %{
+          max_attempts: 3,
+          base_delay_ms: 200,
+          max_delay_ms: 5000
+        }
   def default_policy do
     %{
       max_attempts: @default_max_attempts,
