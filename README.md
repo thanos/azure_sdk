@@ -1,11 +1,18 @@
 # ExAzure
 
-**TODO: Add description**
+[![Hex.pm](https://img.shields.io/hexpm/v/ex_azure.svg)](https://hex.pm/packages/ex_azure)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/ex_azure)
+[![CI](https://github.com/thanos/ex_azure/actions/workflows/ci.yml/badge.svg)](https://github.com/thanos/ex_azure/actions/workflows/ci.yml)
+[![Coverage Status](https://coveralls.io/repos/github/thanos/ex_azure/badge.svg?branch=main)](https://coveralls.io/github/thanos/ex_azure?branch=main)
+[![License](https://img.shields.io/hexpm/l/ex_azure.svg)](https://github.com/thanos/ex_azure/blob/main/LICENSE)
+
+Azure platform SDK for Elixir and Erlang.
+
+ExAzure is not a Blob Storage library. It is a long-term, multi-service Azure SDK built on BEAM-native patterns: explicit client structs, OTP-ready design, first-class telemetry, and a reusable Req pipeline.
+
+**v0.1.0** ships Blob Storage on top of the foundation. Queue, Table, Management, and BEAM integrations are architected from day one.
 
 ## Installation
-
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `ex_azure` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
@@ -15,8 +22,82 @@ def deps do
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/ex_azure>.
+## Quick start
 
-# ex_azure
+```elixir
+credential =
+  ExAzure.Identity.SharedKeyCredential.new(
+    "myaccount",
+    System.fetch_env!("AZURE_STORAGE_KEY")
+  )
+
+client =
+  ExAzure.Storage.Client.new(
+    account: "myaccount",
+    credential: credential
+  )
+
+{:ok, _} = ExAzure.Storage.Container.create(client, "uploads")
+{:ok, blob} = ExAzure.Storage.Blob.upload(client, "uploads", "hello.txt", "Hello, Azure!")
+```
+
+### Local development with Azurite
+
+```bash
+docker compose up -d
+```
+
+```elixir
+client =
+  ExAzure.Storage.Client.new(
+    account: "devstoreaccount1",
+    credential:
+      ExAzure.Identity.SharedKeyCredential.new(
+        "devstoreaccount1",
+        "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+      ),
+    endpoint: "http://127.0.0.1:10000/devstoreaccount1"
+  )
+```
+
+```bash
+AZURITE=true mix test
+```
+
+## Architecture
+
+```
+ExAzure
+├── Identity Plane      (SharedKey, SAS; OAuth planned v0.2)
+├── Data Plane          (Blob v0.1; Queue, Table, File, Data Lake stubbed)
+├── Management Plane    (stubbed for v0.5)
+└── Platform Services   (Pipeline, Telemetry, Retry)
+```
+
+See `plans/architecture.md` for the full design.
+
+## Documentation
+
+| Resource | Location |
+|----------|----------|
+| API reference and guides | [hexdocs.pm/ex_azure](https://hexdocs.pm/ex_azure) |
+| Architecture plans | [`plans/`](https://github.com/thanos/ex_azure/tree/main/plans) |
+| Livebooks | [`livebooks/`](https://github.com/thanos/ex_azure/tree/main/livebooks) |
+| Changelog | [`CHANGELOG.md`](https://github.com/thanos/ex_azure/blob/main/CHANGELOG.md) |
+| Roadmap | [`plans/roadmap.md`](https://github.com/thanos/ex_azure/blob/main/plans/roadmap.md) |
+
+## Telemetry
+
+Every operation emits `:telemetry` events:
+
+```elixir
+:telemetry.attach("ex-azure", [:ex_azure, :request, :stop], fn _, %{duration: d}, meta, _ ->
+  IO.inspect({d, meta})
+end, nil)
+```
+
+See `plans/telemetry-design.md` for the full event catalog.
+
+## License
+
+MIT

@@ -1,0 +1,42 @@
+# Getting Started with ExAzure
+
+```elixir
+Mix.install([
+  {:ex_azure, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Azurite setup
+
+Start Azurite with Docker:
+
+```bash
+docker compose up -d
+```
+
+## Create a client
+
+```elixir
+credential =
+  ExAzure.Identity.SharedKeyCredential.new(
+    "devstoreaccount1",
+    "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+  )
+
+client =
+  ExAzure.Storage.Client.new(
+    account: "devstoreaccount1",
+    credential: credential,
+    endpoint: "http://127.0.0.1:10000/devstoreaccount1"
+  )
+```
+
+## First upload
+
+```elixir
+container = "livebook-demo"
+
+{:ok, _} = ExAzure.Storage.Container.create(client, container)
+{:ok, blob} = ExAzure.Storage.Blob.upload(client, container, "hello.txt", "Hello from Livebook!")
+blob.name
+```

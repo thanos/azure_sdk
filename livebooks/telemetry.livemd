@@ -1,0 +1,60 @@
+# Telemetry with ExAzure
+
+```elixir
+Mix.install([
+  {:ex_azure, path: Path.expand("..", __DIR__)}
+])
+
+{:ok, stats} = Agent.start_link(fn -> %{attempts: 0, durations: []} end)
+
+:telemetry.attach(
+  "ex-azure-attempt",
+  [:ex_azure, :request, :attempt],
+  fn _event, _measurements, metadata, _ ->
+    Agent.update(stats, fn s -> %{s | attempts: s.attempts + 1} end)
+    IO.inspect(metadata, label: "request attempt")
+  end,
+  nil
+)
+
+:telemetry.attach(
+  "ex-azure-stop",
+  [:ex_azure, :request, :stop],
+  fn _event, %{duration: duration}, metadata, _ ->
+    Agent.update(stats, fn s -> %{s | durations: [duration | s.durations]} end)
+    IO.inspect({duration, metadata}, label: "request stop")
+  end,
+  nil
+)
+
+:telemetry.attach(
+  "ex-azure-blob",
+  [:ex_azure, :blob, :put],
+  fn _event, measurements, metadata, _ ->
+    IO.inspect({measurements, metadata}, label: "blob put")
+  end,
+  nil
+)
+```
+
+## Emit events with a blob upload
+
+```elixir
+credential =
+  ExAzure.Identity.SharedKeyCredential.new(
+    "devstoreaccount1",
+    "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+  )
+
+client =
+  ExAzure.Storage.Client.new(
+    account: "devstoreaccount1",
+    credential: credential,
+    endpoint: "http://127.0.0.1:10000/devstoreaccount1"
+  )
+
+container = "telemetry-demo"
+{:ok, _} = ExAzure.Storage.Container.create(client, container)
+{:ok, _} = ExAzure.Storage.Blob.upload(client, container, "metric.txt", "telemetry")
+Agent.get(stats, & &1)
+```

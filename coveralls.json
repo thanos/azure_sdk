@@ -1,0 +1,19 @@
+{
+  "coverage_options": {
+    "minimum_coverage": 80
+  },
+  "skip_files": [
+    "lib/ex_azure/core/client.ex",
+    "lib/ex_azure/integrations/",
+    "lib/ex_azure/management/",
+    "lib/ex_azure/storage/data_lake.ex",
+    "lib/ex_azure/storage/file_share.ex",
+    "lib/ex_azure/storage/queue.ex",
+    "lib/ex_azure/storage/table.ex",
+    "lib/ex_azure/identity/client_secret_credential.ex",
+    "lib/ex_azure/identity/default_azure_credential.ex",
+    "lib/ex_azure/identity/managed_identity_credential.ex",
+    "lib/ex_azure/identity/token_cache.ex",
+    "lib/ex_azure/management/client.ex"
+  ]
+}
