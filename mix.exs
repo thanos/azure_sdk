@@ -87,6 +87,8 @@ defmodule ExAzure.MixProject do
     [
       maintainers: ["ExAzure Contributors"],
       licenses: ["MIT"],
+      maintainers: ["Thanos Vassilakis"],
+      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md),
       links: %{"GitHub" => @source_url}
     ]
   end
