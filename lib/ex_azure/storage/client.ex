@@ -7,6 +7,13 @@ defmodule ExAzure.Storage.Client do
           account: "myaccount",
           credential: credential
         )
+
+  ## Path-style endpoints
+
+  Azurite and some proxies use path-style URLs where the account name appears in the
+  path (`http://127.0.0.1:10000/myaccount`). Set `:path_style` to `true` for those
+  endpoints. When omitted, path-style is auto-detected when the endpoint path ends with
+  the account name.
   """
 
   alias ExAzure.Core.Client
@@ -18,6 +25,7 @@ defmodule ExAzure.Storage.Client do
     :credential,
     :endpoint,
     :api_version,
+    :path_style,
     :retry,
     :req_options
   ]
@@ -27,6 +35,7 @@ defmodule ExAzure.Storage.Client do
           credential: ExAzure.Identity.Credential.t(),
           endpoint: String.t(),
           api_version: String.t(),
+          path_style: boolean(),
           retry: ExAzure.Core.Retry.policy(),
           req_options: keyword()
         }
@@ -40,6 +49,7 @@ defmodule ExAzure.Storage.Client do
   * `:credential` — an `ExAzure.Identity` credential (required)
   * `:endpoint` — custom endpoint (defaults to Azure public cloud or Azurite)
   * `:api_version` — storage API version
+  * `:path_style` — use path-style signing (auto-detected when endpoint ends with account)
   * `:retry` — retry policy map
   * `:req_options` — additional Req options
   """
@@ -47,33 +57,36 @@ defmodule ExAzure.Storage.Client do
   def new(opts) do
     account = Keyword.fetch!(opts, :account)
     credential = Keyword.fetch!(opts, :credential)
+    endpoint = Keyword.get(opts, :endpoint, default_endpoint(account, opts))
 
     %__MODULE__{
       account: account,
       credential: credential,
-      endpoint: Keyword.get(opts, :endpoint, default_endpoint(account, opts)),
+      endpoint: endpoint,
       api_version: Keyword.get(opts, :api_version, @default_api_version),
+      path_style: Keyword.get(opts, :path_style, path_style_endpoint?(account, endpoint)),
       retry: Keyword.get(opts, :retry, ExAzure.Core.Retry.default_policy()),
       req_options: Keyword.get(opts, :req_options, [])
     }
   end
 
   @doc """
-  Returns true when the client targets Azurite or another path-style emulator.
+  Returns true when the client uses path-style signing (e.g. Azurite).
   """
-  @spec emulator?(t()) :: boolean()
-  def emulator?(%__MODULE__{endpoint: endpoint}) when is_binary(endpoint) do
-    not String.contains?(endpoint, ".blob.core.windows.net")
-  end
+  @spec path_style?(t()) :: boolean()
+  def path_style?(%__MODULE__{path_style: value}), do: value
 
-  def emulator?(_), do: false
+  @doc false
+  @deprecated "Use path_style?/1 instead"
+  @spec emulator?(t()) :: boolean()
+  def emulator?(client), do: path_style?(client)
 
   @doc """
   Metadata passed to the signing pipeline for storage requests.
   """
-  @spec signing_metadata(t()) :: %{api_version: String.t(), emulator: boolean()}
+  @spec signing_metadata(t()) :: %{api_version: String.t(), path_style: boolean()}
   def signing_metadata(%__MODULE__{} = client) do
-    %{api_version: client.api_version, emulator: emulator?(client)}
+    %{api_version: client.api_version, path_style: client.path_style}
   end
 
   @doc """
@@ -98,4 +111,12 @@ defmodule ExAzure.Storage.Client do
       :file -> "https://#{account}.file.core.windows.net"
     end
   end
+
+  defp path_style_endpoint?(account, endpoint) when is_binary(endpoint) do
+    endpoint
+    |> String.trim_trailing("/")
+    |> String.ends_with?("/#{account}")
+  end
+
+  defp path_style_endpoint?(_, _), do: false
 end

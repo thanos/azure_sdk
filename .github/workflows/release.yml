@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
 
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@v1.2.0
         with:
           elixir-version: ${{ env.ELIXIR_VERSION }}
           otp-version: ${{ env.OTP_VERSION }}
@@ -82,7 +82,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: erlef/setup-beam@v1
+      - uses: erlef/setup-beam@v1.2.0
         with:
           elixir-version: ${{ env.ELIXIR_VERSION }}
           otp-version: ${{ env.OTP_VERSION }}

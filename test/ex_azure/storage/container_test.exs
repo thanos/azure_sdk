@@ -25,11 +25,35 @@ defmodule ExAzure.Storage.ContainerTest do
     assert {:ok, :deleted} = Container.delete(client, "uploads")
   end
 
+  test "ignores unknown opts on delete", %{bypass: bypass, client: client} do
+    AzureMock.stub_delete_container(bypass, "uploads")
+
+    assert {:ok, :deleted} = Container.delete(client, "uploads", metadata: %{"a" => "b"})
+  end
+
   test "lists containers", %{bypass: bypass, client: client} do
     AzureMock.stub_list_containers(bypass, ["a", "b"])
 
     assert {:ok, containers} = Container.list(client)
     assert Enum.map(containers, & &1.name) == ["a", "b"]
+  end
+
+  test "lists containers across pages", %{bypass: bypass, client: client} do
+    AzureMock.stub_list_containers_paginated(bypass, [
+      %{containers: ["a"], marker: "page-2"},
+      %{containers: ["b"], marker: nil}
+    ])
+
+    assert {:ok, containers} = Container.list(client)
+    assert Enum.map(containers, & &1.name) == ["a", "b"]
+  end
+
+  test "returns empty list for invalid list xml", %{bypass: bypass, client: client} do
+    Bypass.expect(bypass, "GET", AzureMock.path([]), fn conn ->
+      Plug.Conn.resp(conn, 200, "")
+    end)
+
+    assert {:ok, []} = Container.list(client)
   end
 
   test "lists blobs in a container", %{bypass: bypass, client: client} do

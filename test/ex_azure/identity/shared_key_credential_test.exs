@@ -13,7 +13,7 @@ defmodule ExAzure.Identity.SharedKeyCredentialTest do
         method: :get,
         path: "/container",
         headers: %{"x-ms-version" => "2021-08-06"},
-        metadata: %{api_version: "2021-08-06", emulator: true}
+        metadata: %{api_version: "2021-08-06", path_style: true}
       )
 
     signed = Credential.sign_request(credential, request)

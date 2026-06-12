@@ -1,11 +1,11 @@
-# Streaming with ExAzure
+# Buffered enumerables with ExAzure
+
+In v0.1.0, `upload_stream/4` and `download_stream/4` accept enumerables but buffer
+content in memory. Chunked streaming is planned for a future release.
 
 ```elixir
 Mix.install([
-  {:ex_azure, path: "."},
-  {:req, "~> 0.5"},
-  {:sweet_xml, "~> 0.7"},
-  {:telemetry, "~> 1.3"}
+  {:ex_azure, path: Path.expand("..", __DIR__)}
 ])
 
 credential =

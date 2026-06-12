@@ -2,11 +2,13 @@ defmodule ExAzure.Storage.Blob do
   @moduledoc """
   Azure Blob Storage operations.
 
-  Supports binary, iodata, and streaming uploads and downloads.
+  Supports binary and iodata uploads and downloads. `upload_stream/4` and
+  `download_stream/4` accept enumerables but buffer content in memory in v0.1.0;
+  chunked streaming is planned for a future release.
   """
 
   alias ExAzure.Core.{Pipeline, Request, Response, Telemetry}
-  alias ExAzure.Storage.Client
+  alias ExAzure.Storage.{Client, Metadata, Path}
 
   @type blob :: %{
           container: String.t(),
@@ -44,12 +46,14 @@ defmodule ExAzure.Storage.Blob do
   end
 
   @doc """
-  Uploads a blob from a stream enumerable.
+  Uploads a blob from an enumerable.
+
+  In v0.1.0 the enumerable is fully materialized in memory before upload.
   """
   @spec upload_stream(Client.t(), String.t(), String.t(), Enumerable.t(), keyword()) ::
           {:ok, blob()} | {:error, ExAzure.Error.t()}
   def upload_stream(client, container, name, stream, opts \\ []) do
-    Telemetry.emit_operation(:blob, :put, %{container: container, name: name, streaming: true})
+    Telemetry.emit_operation(:blob, :put, %{container: container, name: name, buffered: true})
 
     content = stream |> Enum.into([]) |> IO.iodata_to_binary()
     upload(client, container, name, content, opts)
@@ -67,7 +71,7 @@ defmodule ExAzure.Storage.Blob do
       Request.new(
         method: :get,
         path: blob_path(container, name),
-        headers: base_headers(client, opts),
+        headers: base_headers(client),
         service: :blob,
         operation: :get,
         metadata: Client.signing_metadata(client)
@@ -79,7 +83,10 @@ defmodule ExAzure.Storage.Blob do
   end
 
   @doc """
-  Downloads a blob as a lazy stream of chunks.
+  Downloads a blob as an enumerable.
+
+  In v0.1.0 the full blob is downloaded into memory first, then exposed as a
+  single-chunk enumerable. Chunked streaming is planned for a future release.
   """
   @spec download_stream(Client.t(), String.t(), String.t(), keyword()) ::
           {:ok, Enumerable.t()} | {:error, ExAzure.Error.t()}
@@ -102,14 +109,14 @@ defmodule ExAzure.Storage.Blob do
   """
   @spec delete(Client.t(), String.t(), String.t(), keyword()) ::
           {:ok, :deleted} | {:error, ExAzure.Error.t()}
-  def delete(client, container, name, opts \\ []) do
+  def delete(client, container, name, _opts \\ []) do
     Telemetry.emit_operation(:blob, :delete, %{container: container, name: name})
 
     request =
       Request.new(
         method: :delete,
         path: blob_path(container, name),
-        headers: base_headers(client, opts),
+        headers: base_headers(client),
         service: :blob,
         operation: :delete,
         metadata: Client.signing_metadata(client)
@@ -125,36 +132,38 @@ defmodule ExAzure.Storage.Blob do
   """
   @spec metadata(Client.t(), String.t(), String.t(), keyword()) ::
           {:ok, map()} | {:error, ExAzure.Error.t()}
-  def metadata(client, container, name, opts \\ []) do
+  def metadata(client, container, name, _opts \\ []) do
     Telemetry.emit_operation(:blob, :metadata, %{container: container, name: name})
 
     request =
       Request.new(
         method: :head,
         path: blob_path(container, name),
-        headers: base_headers(client, opts),
+        headers: base_headers(client),
         service: :blob,
         operation: :metadata,
         metadata: Client.signing_metadata(client)
       )
 
     with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
-      {:ok, metadata_from_headers(response.headers)}
+      {:ok, Metadata.from_headers(response.headers)}
     end
   end
 
   @doc """
   Sets blob metadata. Replaces all existing metadata keys.
+
+  Returns the metadata that was set.
   """
   @spec set_metadata(Client.t(), String.t(), String.t(), map(), keyword()) ::
           {:ok, map()} | {:error, ExAzure.Error.t()}
-  def set_metadata(client, container, name, metadata, opts \\ []) do
+  def set_metadata(client, container, name, metadata, _opts \\ []) do
     Telemetry.emit_operation(:blob, :set_metadata, %{container: container, name: name})
 
     headers =
       client
-      |> base_headers(opts)
-      |> Map.merge(metadata_headers(metadata))
+      |> base_headers()
+      |> Map.merge(Metadata.headers(metadata))
 
     request =
       Request.new(
@@ -167,13 +176,13 @@ defmodule ExAzure.Storage.Blob do
         metadata: Client.signing_metadata(client)
       )
 
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
-      {:ok, metadata_from_headers(response.headers)}
+    with {:ok, _} <- Pipeline.run(Client.to_core_client(client), request) do
+      {:ok, metadata}
     end
   end
 
   defp blob_path(container, name) do
-    "/#{URI.encode(container)}/#{URI.encode(name)}"
+    Path.join([container | String.split(name, "/", parts: :infinity)])
   end
 
   defp upload_headers(opts, size) do
@@ -184,29 +193,11 @@ defmodule ExAzure.Storage.Blob do
       "Content-Length" => Integer.to_string(size),
       "x-ms-blob-type" => Keyword.get(opts, :blob_type, "BlockBlob")
     }
-    |> Map.merge(metadata_headers(Keyword.get(opts, :metadata, %{})))
+    |> Map.merge(Metadata.headers(Keyword.get(opts, :metadata, %{})))
   end
 
-  defp base_headers(client, opts) do
-    %{
-      "x-ms-version" => client.api_version
-    }
-    |> Map.merge(metadata_headers(Keyword.get(opts, :metadata, %{})))
-  end
-
-  defp metadata_headers(metadata) when is_map(metadata) do
-    metadata
-    |> Enum.map(fn {k, v} -> {"x-ms-meta-#{k}", to_string(v)} end)
-    |> Map.new()
-  end
-
-  defp metadata_from_headers(headers) do
-    headers
-    |> Enum.filter(fn {k, _} -> String.starts_with?(String.downcase(k), "x-ms-meta-") end)
-    |> Map.new(fn {k, v} ->
-      key = k |> String.downcase() |> String.replace_prefix("x-ms-meta-", "")
-      {key, v}
-    end)
+  defp base_headers(client) do
+    %{"x-ms-version" => client.api_version}
   end
 
   defp blob_from_response(container, name, %Response{} = response, content, opts) do
@@ -219,9 +210,13 @@ defmodule ExAzure.Storage.Blob do
         etag: response_header(response, "etag"),
         last_modified: response_header(response, "last-modified")
       },
-      metadata: metadata_from_headers(response.headers),
-      content: Keyword.get(opts, :include_content, true) && content
+      metadata: Metadata.from_headers(response.headers),
+      content: content_value(content, opts)
     }
+  end
+
+  defp content_value(content, opts) do
+    if Keyword.get(opts, :include_content, true), do: content
   end
 
   defp response_header(%Response{headers: headers}, name) do

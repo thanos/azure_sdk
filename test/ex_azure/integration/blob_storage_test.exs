@@ -4,11 +4,11 @@ defmodule ExAzure.Integration.BlobStorageTest do
   alias ExAzure.Storage.{Blob, Container}
 
   setup do
-    if azurite_available?() do
-      :ok
-    else
-      {:skip, "Azurite is not running on port 10000"}
+    unless azurite_available?() do
+      raise "Azurite is not running on port 10000. Start with: docker compose up -d"
     end
+
+    :ok
   end
 
   test "container and blob lifecycle" do

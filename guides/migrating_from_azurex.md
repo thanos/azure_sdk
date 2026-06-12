@@ -1,6 +1,6 @@
 # Migrating from Azurex
 
-[Azurex](https://github.com/treasure-data/azurex) served Elixir Blob Storage needs. ExAzure is the successor platform SDK.
+[Azurex](https://github.com/jakobht/azurex) served Elixir Blob Storage needs. ExAzure is the successor platform SDK.
 
 ## Why Migrate?
 
@@ -16,7 +16,7 @@ See `plans/azurex-review.md` for details.
 ## Dependency
 
 ```elixir
-# Remove: {:azurex, "~> 0.3"}
+# Remove: {:azurex, "~> 1.1"}
 # Add:
 {:ex_azure, "~> 0.1.0"}
 ```

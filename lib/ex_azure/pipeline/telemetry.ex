@@ -6,7 +6,7 @@ defmodule ExAzure.Pipeline.Telemetry do
   """
   @spec apply(ExAzure.Core.Request.t(), map()) :: ExAzure.Core.Request.t()
   def apply(%ExAzure.Core.Request{} = request, metadata) do
-    ExAzure.Core.Telemetry.emit_request(metadata)
+    ExAzure.Core.Telemetry.emit_attempt(metadata)
     request
   end
 end

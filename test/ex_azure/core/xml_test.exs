@@ -35,6 +35,17 @@ defmodule ExAzure.Core.XmlTest do
     assert [%{name: "uploads"}] = ListContainers.parse(xml)
   end
 
+  test "returns empty map for malformed error xml" do
+    assert Error.parse("<html>oops") == %{}
+    assert Error.parse("plain text") == %{}
+    assert Error.parse("") == %{}
+  end
+
+  test "returns empty list for malformed container list xml" do
+    assert ListContainers.parse("") == []
+    assert ListContainers.parse("not xml") == []
+  end
+
   test "parses list blobs xml" do
     xml = """
     <?xml version="1.0" encoding="utf-8"?>

@@ -26,9 +26,9 @@ defmodule ExAzure do
   See the guides in `guides/` and livebooks in `livebooks/` for deeper coverage.
   """
 
-  @version "0.1.0"
-
   @doc "Returns the current ExAzure version."
   @spec version() :: String.t()
-  def version, do: @version
+  def version do
+    Application.spec(:ex_azure, :vsn) |> to_string()
+  end
 end

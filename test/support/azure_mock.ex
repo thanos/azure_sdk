@@ -171,11 +171,58 @@ defmodule ExAzure.AzureMock do
   end
 
   def stub_retry_then_success(bypass, route, fail_status \\ 503, body \\ "ok") do
-    Bypass.expect(bypass, "GET", route, fn conn ->
-      Plug.Conn.resp(conn, fail_status, "")
-    end)
+    {:ok, counter} = Agent.start_link(fn -> 0 end)
 
     Bypass.expect(bypass, "GET", route, fn conn ->
+      attempt = Agent.get_and_update(counter, &{&1, &1 + 1})
+
+      if attempt == 0 do
+        Plug.Conn.resp(conn, fail_status, "")
+      else
+        Plug.Conn.resp(conn, 200, body)
+      end
+    end)
+
+    counter
+  end
+
+  def stub_list_containers_paginated(bypass, pages) when is_list(pages) do
+    {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+    Bypass.expect(bypass, "GET", path([]), fn conn ->
+      index = Agent.get_and_update(counter, &{&1, &1 + 1})
+
+      %{containers: containers, marker: marker} =
+        Enum.at(pages, index, %{containers: [], marker: nil})
+
+      entries =
+        Enum.map_join(containers, "", fn name ->
+          """
+          <Container>
+            <Name>#{name}</Name>
+            <Properties>
+              <Last-Modified>Wed, 01 Jan 2025 00:00:00 GMT</Last-Modified>
+              <Etag>"0x1"</Etag>
+            </Properties>
+          </Container>
+          """
+        end)
+
+      marker_xml =
+        case marker do
+          nil -> ""
+          "" -> ""
+          value -> "<NextMarker>#{value}</NextMarker>"
+        end
+
+      body = """
+      <?xml version="1.0" encoding="utf-8"?>
+      <EnumerationResults>
+        #{marker_xml}
+        <Containers>#{entries}</Containers>
+      </EnumerationResults>
+      """
+
       Plug.Conn.resp(conn, 200, body)
     end)
   end

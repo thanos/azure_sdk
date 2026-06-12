@@ -36,7 +36,7 @@ defmodule ExAzure.Pipeline.SharedKey do
   @spec string_to_sign(Request.t(), String.t()) :: String.t()
   def string_to_sign(%Request{} = request, account) do
     headers = request.headers
-    emulator? = Map.get(request.metadata, :emulator, false)
+    path_style? = Map.get(request.metadata, :path_style, false)
 
     [
       request.method |> Atom.to_string() |> String.upcase(),
@@ -52,7 +52,7 @@ defmodule ExAzure.Pipeline.SharedKey do
       Map.get(headers, "If-Unmodified-Since", ""),
       Map.get(headers, "Range", ""),
       canonicalized_headers(headers),
-      canonicalized_resource(account, request.path, request.query, emulator?)
+      canonicalized_resource(account, request.path, request.query, path_style?)
     ]
     |> Enum.join("\n")
   end
@@ -89,12 +89,12 @@ defmodule ExAzure.Pipeline.SharedKey do
     |> Enum.map_join("\n", fn {k, v} -> "#{k}:#{v}" end)
   end
 
-  defp canonicalized_resource(account, path, query, emulator?) do
+  defp canonicalized_resource(account, path, query, path_style?) do
     account = account |> String.replace("-secondary", "")
     normalized_path = if String.starts_with?(path, "/"), do: path, else: "/" <> path
 
     resource_path =
-      if emulator? do
+      if path_style? do
         "/#{account}/#{account}#{normalized_path}"
       else
         "/#{account}#{normalized_path}"

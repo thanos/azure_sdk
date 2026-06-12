@@ -2,10 +2,7 @@
 
 ```elixir
 Mix.install([
-  {:ex_azure, path: "."},
-  {:req, "~> 0.5"},
-  {:sweet_xml, "~> 0.7"},
-  {:telemetry, "~> 1.3"}
+  {:ex_azure, path: Path.expand("..", __DIR__)}
 ])
 ```
 

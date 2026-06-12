@@ -1,5 +1,5 @@
 defmodule ExAzure.Core.PipelineTest do
-  use ExAzure.AzureMockCase, async: false
+  use ExAzure.AzureMockCase, async: true
 
   alias ExAzure.Core.{Pipeline, Request}
   alias ExAzure.Storage.Client
@@ -24,6 +24,16 @@ defmodule ExAzure.Core.PipelineTest do
   end
 
   test "retries transient failures", %{bypass: bypass, client: client, account: account} do
+    retry_ref =
+      :telemetry.attach(
+        make_ref(),
+        [:ex_azure, :retry],
+        fn event, measurements, metadata, _ ->
+          send(self(), {event, measurements, metadata})
+        end,
+        nil
+      )
+
     AzureMock.stub_retry_then_success(bypass, AzureMock.path([], account), 503, "retry-ok")
 
     request =
@@ -39,6 +49,33 @@ defmodule ExAzure.Core.PipelineTest do
 
     assert {:ok, response} = Pipeline.run(Client.to_core_client(client), request)
     assert response.body == "retry-ok"
+    assert_received {[:ex_azure, :retry], %{delay_ms: _}, %{attempt: 1}}
+    :telemetry.detach(retry_ref)
+  end
+
+  test "returns error after retry exhaustion", %{bypass: bypass, account: account} do
+    client =
+      ExAzure.AzureMock.client(bypass,
+        retry: %{max_attempts: 2, base_delay_ms: 1, max_delay_ms: 1}
+      )
+
+    Bypass.expect(bypass, "GET", AzureMock.path([], account), fn conn ->
+      Plug.Conn.resp(conn, 503, "")
+    end)
+
+    request =
+      Request.new(
+        method: :get,
+        path: "/",
+        query: [{"comp", "list"}],
+        headers: %{"x-ms-version" => client.api_version},
+        service: :blob,
+        operation: :list_containers,
+        metadata: Client.signing_metadata(client)
+      )
+
+    assert {:error, %{status: 503, service: :blob}} =
+             Pipeline.run(Client.to_core_client(client), request)
   end
 
   test "returns structured errors for non-2xx responses", %{

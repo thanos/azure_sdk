@@ -9,8 +9,6 @@ defmodule ExAzure.Core.Pipeline do
 
   alias ExAzure.Core.{Client, Request, Response, Retry, Telemetry}
   alias ExAzure.Error
-  alias ExAzure.Pipeline.SAS
-  alias ExAzure.Pipeline.SharedKey
 
   @doc """
   Executes a request through the pipeline and returns `{:ok, response}` or `{:error, error}`.
@@ -55,16 +53,7 @@ defmodule ExAzure.Core.Pipeline do
   end
 
   defp sign(request, %Client{credential: credential}) when not is_nil(credential) do
-    case credential do
-      %ExAzure.Identity.SharedKeyCredential{} ->
-        SharedKey.apply(request, credential)
-
-      %ExAzure.Identity.SASCredential{} ->
-        SAS.apply(request, credential)
-
-      _ ->
-        ExAzure.Identity.Credential.sign_request(credential, request)
-    end
+    ExAzure.Identity.Credential.sign_request(credential, request)
   end
 
   defp sign(request, _), do: request
@@ -109,16 +98,13 @@ defmodule ExAzure.Core.Pipeline do
   end
 
   defp build_req_opts(%Client{req_options: client_opts}, %Request{} = request, url, opts) do
-    headers =
-      request.headers
-      |> Map.to_list()
-      |> Enum.map(fn {k, v} -> {k, v} end)
-
     base = [
       method: request.method,
       url: url,
-      headers: headers,
-      retry: false
+      headers: Map.to_list(request.headers),
+      retry: false,
+      decode_body: false,
+      compressed: false
     ]
 
     base =

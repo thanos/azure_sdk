@@ -1,6 +1,8 @@
 defmodule ExAzure.Storage.ClientTest do
   use ExUnit.Case, async: true
 
+  alias ExAzure.Core.Request
+  alias ExAzure.Pipeline.SharedKey
   alias ExAzure.Storage.Client
 
   test "builds default blob endpoint" do
@@ -14,23 +16,20 @@ defmodule ExAzure.Storage.ClientTest do
 
     assert client.endpoint == "https://myaccount.blob.core.windows.net"
     assert client.api_version == "2024-11-04"
-    refute Client.emulator?(client)
+    refute Client.path_style?(client)
   end
 
-  test "builds queue, table, and file endpoints" do
+  test "builds queue, table, and file endpoints without path-style signing" do
     credential = ExAzure.AzureMock.credential()
 
-    assert Client.new(account: "a", credential: credential, service: :queue).endpoint ==
-             "https://a.queue.core.windows.net"
-
-    assert Client.new(account: "a", credential: credential, service: :table).endpoint ==
-             "https://a.table.core.windows.net"
-
-    assert Client.new(account: "a", credential: credential, service: :file).endpoint ==
-             "https://a.file.core.windows.net"
+    for service <- [:queue, :table, :file] do
+      client = Client.new(account: "a", credential: credential, service: service)
+      refute Client.path_style?(client)
+      assert %{path_style: false} = Client.signing_metadata(client)
+    end
   end
 
-  test "detects emulator endpoints" do
+  test "detects path-style endpoints" do
     credential = ExAzure.AzureMock.credential()
 
     client =
@@ -40,8 +39,32 @@ defmodule ExAzure.Storage.ClientTest do
         endpoint: "http://127.0.0.1:10000/mockaccount"
       )
 
-    assert Client.emulator?(client)
-    assert %{emulator: true, api_version: "2024-11-04"} = Client.signing_metadata(client)
+    assert Client.path_style?(client)
+    assert %{path_style: true, api_version: "2024-11-04"} = Client.signing_metadata(client)
+  end
+
+  test "sovereign cloud endpoints use host-style signing" do
+    credential = ExAzure.AzureMock.credential()
+
+    client =
+      Client.new(
+        account: "acct",
+        credential: credential,
+        endpoint: "https://acct.blob.core.usgovcloudapi.net"
+      )
+
+    refute Client.path_style?(client)
+
+    request =
+      Request.new(
+        method: :get,
+        path: "/container/blob",
+        metadata: Client.signing_metadata(client)
+      )
+
+    string = SharedKey.string_to_sign(request, "acct")
+    assert String.ends_with?(string, "/acct/container/blob")
+    refute String.contains?(string, "/acct/acct/")
   end
 
   test "converts to core client" do

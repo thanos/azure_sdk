@@ -3,6 +3,8 @@ defmodule ExAzure.Core.Xml.Error do
 
   import SweetXml
 
+  alias ExAzure.Core.Xml.Safe
+
   @type parsed :: %{
           optional(:code) => String.t() | nil,
           optional(:message) => String.t() | nil,
@@ -15,6 +17,13 @@ defmodule ExAzure.Core.Xml.Error do
   def parse(""), do: %{}
 
   def parse(xml) when is_binary(xml) do
+    case Safe.run(fn -> parse_xml(xml) end) do
+      {:ok, parsed} -> parsed
+      {:error, :invalid_xml} -> %{}
+    end
+  end
+
+  defp parse_xml(xml) do
     xml
     |> xpath(
       ~x"/Error"l,
@@ -32,8 +41,6 @@ defmodule ExAzure.Core.Xml.Error do
           details: Map.drop(error, [:code, :message])
         }
     end
-  rescue
-    _ -> %{}
   end
 
   defp blank_to_nil(""), do: nil

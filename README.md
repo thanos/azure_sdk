@@ -1,6 +1,6 @@
 # ExAzure
 
-The canonical Azure platform SDK for Elixir and Erlang.
+Azure platform SDK for Elixir and Erlang.
 
 ExAzure is not a Blob Storage library. It is a long-term, multi-service Azure SDK built on BEAM-native patterns: explicit client structs, OTP-ready design, first-class telemetry, and a reusable Req pipeline.
 
@@ -85,8 +85,8 @@ See `plans/architecture.md` for the full design.
 Every operation emits `:telemetry` events:
 
 ```elixir
-:telemetry.attach("ex-azure", [:ex_azure, :request], fn _, measurements, meta, _ ->
-  IO.inspect({measurements, meta})
+:telemetry.attach("ex-azure", [:ex_azure, :request, :stop], fn _, %{duration: d}, meta, _ ->
+  IO.inspect({d, meta})
 end, nil)
 ```
 

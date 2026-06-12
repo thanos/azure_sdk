@@ -4,7 +4,9 @@ defmodule ExAzure.Core.Telemetry do
 
   ## Events
 
-  * `[:ex_azure, :request]` — emitted for every HTTP request
+  * `[:ex_azure, :request, :start]` — pipeline span started
+  * `[:ex_azure, :request, :stop]` — pipeline span finished with duration
+  * `[:ex_azure, :request, :attempt]` — emitted before each HTTP attempt
   * `[:ex_azure, :auth, :sign]` — emitted when a request is signed
   * `[:ex_azure, :retry]` — emitted on retry backoff
   * `[:ex_azure, :blob, :put | :get | :delete | ...]` — service operations
@@ -13,7 +15,7 @@ defmodule ExAzure.Core.Telemetry do
 
       :telemetry.attach(
         "ex-azure-logger",
-        [:ex_azure, :request],
+        [:ex_azure, :request, :stop],
         fn _event, measurements, metadata, _config ->
           IO.inspect({measurements, metadata}, label: "ex_azure request")
         end,
@@ -22,16 +24,20 @@ defmodule ExAzure.Core.Telemetry do
   """
 
   @doc """
-  Emits a request telemetry event.
+  Emits a per-attempt request telemetry event.
   """
-  @spec emit_request(map()) :: :ok
-  def emit_request(metadata) do
+  @spec emit_attempt(map()) :: :ok
+  def emit_attempt(metadata) do
     :telemetry.execute(
-      [:ex_azure, :request],
+      [:ex_azure, :request, :attempt],
       %{count: 1},
       metadata
     )
   end
+
+  @doc false
+  @spec emit_request(map()) :: :ok
+  def emit_request(metadata), do: emit_attempt(metadata)
 
   @doc """
   Emits an operation telemetry event for a service module.
@@ -64,14 +70,16 @@ defmodule ExAzure.Core.Telemetry do
   def span(metadata, fun) do
     start = System.monotonic_time()
 
+    :telemetry.execute([:ex_azure, :request, :start], %{}, metadata)
+
     try do
       fun.()
     after
       duration = System.monotonic_time() - start
 
       :telemetry.execute(
-        [:ex_azure, :request],
-        %{duration: duration, count: 1},
+        [:ex_azure, :request, :stop],
+        %{duration: duration},
         metadata
       )
     end

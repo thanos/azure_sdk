@@ -34,6 +34,13 @@ defmodule ExAzure.Core.ErrorTest do
     assert %RuntimeError{} = error.cause
   end
 
+  test "builds errors from non-exception reasons" do
+    error = Error.from_exception(:blob, :timeout)
+
+    assert error.message == ":timeout"
+    assert error.cause == :timeout
+  end
+
   test "creates custom errors" do
     assert %Error{code: "Test", message: "boom"} =
              Error.new(code: "Test", message: "boom")

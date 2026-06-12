@@ -32,6 +32,25 @@ defmodule ExAzure.Storage.BlobTest do
     assert {:ok, %{content: "payload"}} = Blob.download(client, "uploads", "hello.txt")
   end
 
+  test "downloads json blobs as raw bytes", %{bypass: bypass, client: client} do
+    body = ~s({"a": 1})
+
+    Bypass.expect(bypass, "GET", AzureMock.path(["uploads", "data.json"]), fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.resp(200, body)
+    end)
+
+    assert {:ok, %{content: ^body}} = Blob.download(client, "uploads", "data.json")
+  end
+
+  test "include_content false returns nil content", %{bypass: bypass, client: client} do
+    AzureMock.stub_get_blob(bypass, "uploads", "hello.txt", "payload")
+
+    assert {:ok, %{content: nil}} =
+             Blob.download(client, "uploads", "hello.txt", include_content: false)
+  end
+
   test "downloads a blob as a stream", %{bypass: bypass, client: client} do
     AzureMock.stub_get_blob(bypass, "uploads", "hello.txt", "payload")
 
@@ -54,7 +73,8 @@ defmodule ExAzure.Storage.BlobTest do
   test "sets blob metadata", %{bypass: bypass, client: client} do
     AzureMock.stub_put_blob_metadata(bypass, "uploads", "hello.txt")
 
-    assert {:ok, %{}} = Blob.set_metadata(client, "uploads", "hello.txt", %{"tier" => "hot"})
+    assert {:ok, %{"tier" => "hot"}} =
+             Blob.set_metadata(client, "uploads", "hello.txt", %{"tier" => "hot"})
   end
 
   test "returns azure error on failure", %{bypass: bypass, client: client, account: account} do

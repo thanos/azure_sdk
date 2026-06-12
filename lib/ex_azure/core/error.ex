@@ -48,11 +48,14 @@ defmodule ExAzure.Error do
   @spec from_exception(atom(), term()) :: t()
   def from_exception(service, reason) do
     %__MODULE__{
-      message: Exception.message(reason),
+      message: exception_message(reason),
       service: service,
       cause: reason
     }
   end
+
+  defp exception_message(reason) when is_exception(reason), do: Exception.message(reason)
+  defp exception_message(reason), do: inspect(reason)
 
   defp header_value(headers, name) when is_map(headers) do
     headers

@@ -25,6 +25,31 @@ defmodule ExAzure.Pipeline.SharedKeyTest do
     assert String.ends_with?(string, "/testaccount/container/blob")
   end
 
+  test "path-style signing duplicates account in canonicalized resource" do
+    request =
+      Request.new(
+        method: :get,
+        path: "/container/blob",
+        metadata: %{path_style: true}
+      )
+
+    string = SharedKey.string_to_sign(request, @account)
+    assert String.ends_with?(string, "/testaccount/testaccount/container/blob")
+  end
+
+  test "host-style signing uses a single account prefix" do
+    request =
+      Request.new(
+        method: :get,
+        path: "/container/blob",
+        metadata: %{path_style: false}
+      )
+
+    string = SharedKey.string_to_sign(request, @account)
+    assert String.ends_with?(string, "/testaccount/container/blob")
+    refute String.contains?(string, "/testaccount/testaccount/")
+  end
+
   test "adds Authorization header" do
     credential = SharedKeyCredential.new(@account, @key)
 

@@ -12,39 +12,23 @@ on:
 
 jobs:
   quality:
-    name: Quality (${{ matrix.elixir }} / OTP ${{ matrix.otp }})
+    name: Quality
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - elixir: "1.17"
-            otp: "27"
-          - elixir: "1.18"
-            otp: "27"
-          - elixir: "1.19"
-            otp: "27"
-          - elixir: "1.19"
-            otp: "28"
-          - elixir: "1.20"
-            otp: "27"
-          - elixir: "1.20"
-            otp: "28"
-          - elixir: "1.20"
-            otp: "29"
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@v4.2.2
+      - uses: erlef/setup-beam@v1.2.0
         with:
-          otp-version: ${{ matrix.otp }}
-          elixir-version: ${{ matrix.elixir }}
+          otp-version: "28"
+          elixir-version: "1.20"
       - name: Cache deps
-        uses: actions/cache@v4
+        uses: actions/cache@v4.2.3
         with:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-quality-${{ hashFiles('**/mix.lock') }}
       - run: mix deps.get
       - run: mix format --check-formatted
       - run: mix credo --strict
@@ -53,12 +37,21 @@ jobs:
 
   dialyzer:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@v4.2.2
+      - uses: erlef/setup-beam@v1.2.0
         with:
           otp-version: "28"
           elixir-version: "1.19"
+      - name: Cache deps
+        uses: actions/cache@v4.2.3
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-dialyzer-${{ hashFiles('**/mix.lock') }}
       - run: mix deps.get
       - run: mix dialyzer
 
@@ -93,22 +86,47 @@ jobs:
     env:
       AZURITE: "true"
       PROPERTY: "true"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@v4.2.2
+      - uses: erlef/setup-beam@v1.2.0
         with:
           otp-version: ${{ matrix.otp }}
           elixir-version: ${{ matrix.elixir }}
+      - name: Cache deps
+        uses: actions/cache@v4.2.3
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
       - run: mix deps.get
       - run: mix test --cover
 
+  livebooks:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - run: ./scripts/validate_livebooks.sh
+
   docs:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+      - uses: actions/checkout@v4.2.2
+      - uses: erlef/setup-beam@v1.2.0
         with:
           otp-version: "28"
           elixir-version: "1.20"
+      - name: Cache deps
+        uses: actions/cache@v4.2.3
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-docs-${{ hashFiles('**/mix.lock') }}
       - run: mix deps.get
       - run: mix docs

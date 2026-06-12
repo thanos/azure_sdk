@@ -2,7 +2,7 @@ defmodule ExAzure.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/ex-azure/ex_azure"
+  @source_url "https://github.com/thanos/ex_azure"
 
   def project do
     [
@@ -12,39 +12,14 @@ defmodule ExAzure.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       name: "ExAzure",
-      description: "The canonical Azure platform SDK for Elixir and Erlang",
+      description: "Azure platform SDK for Elixir and Erlang",
       package: package(),
       docs: docs(),
       dialyzer: [
         plt_add_apps: [:mix, :ex_unit],
         flags: [:error_handling, :underspecs]
       ],
-      test_coverage: [
-        tool: ExCoveralls,
-        summary: [threshold: 80],
-        ignore_modules: [
-          ExAzure.Integrations.Broadway,
-          ExAzure.Integrations.Explorer,
-          ExAzure.Integrations.Flow,
-          ExAzure.Integrations.Livebook,
-          ExAzure.Integrations.Nx,
-          ExAzure.Management.Network,
-          ExAzure.Management.Policy,
-          ExAzure.Management.Replication,
-          ExAzure.Management.StorageAccount,
-          ExAzure.Storage.DataLake,
-          ExAzure.Storage.FileShare,
-          ExAzure.Storage.Queue,
-          ExAzure.Storage.Table,
-          ExAzure.Identity.ClientSecretCredential,
-          ExAzure.Identity.DefaultAzureCredential,
-          ExAzure.Identity.ManagedIdentityCredential,
-          ExAzure.Identity.TokenCache,
-          ExAzure.Management.Client,
-          ExAzure.Pipeline.Retry,
-          ExAzure.Core.Client
-        ]
-      ],
+      test_coverage: [tool: ExCoveralls],
       test_paths: ["test"],
       test_ignore_filters: [~r/support\//]
     ]
@@ -85,9 +60,8 @@ defmodule ExAzure.MixProject do
 
   defp package do
     [
-      maintainers: ["ExAzure Contributors"],
-      licenses: ["MIT"],
       maintainers: ["Thanos Vassilakis"],
+      licenses: ["MIT"],
       files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md),
       links: %{"GitHub" => @source_url}
     ]
