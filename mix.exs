@@ -1,17 +1,17 @@
-defmodule ExAzure.MixProject do
+defmodule AzureSDK.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/thanos/ex_azure"
+  @source_url "https://github.com/thanos/azure_sdk"
 
   def project do
     [
-      app: :ex_azure,
+      app: :azure_sdk,
       version: @version,
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      name: "ExAzure",
+      name: "Azure SDK",
       description: "Azure platform SDK for Elixir and Erlang",
       package: package(),
       docs: docs(),
@@ -83,7 +83,7 @@ defmodule ExAzure.MixProject do
         "guides/management_plane_design.md"
       ],
       groups_for_extras: [
-        "Using ExAzure": [
+        "Using Azure SDK": [
           "guides/azure_for_elixir_developers.md",
           "guides/identity_vs_data_plane.md",
           "guides/migrating_from_azurex.md",
@@ -97,10 +97,10 @@ defmodule ExAzure.MixProject do
         ]
       ],
       groups_for_modules: [
-        Identity: [~r/^ExAzure\.Identity\./],
-        Storage: [~r/^ExAzure\.Storage\./],
-        Core: [~r/^ExAzure\.Core\./, ExAzure.Error],
-        Pipeline: [~r/^ExAzure\.Pipeline\./]
+        Identity: [~r/^AzureSDK\.Identity\./],
+        Storage: [~r/^AzureSDK\.Storage\./],
+        Core: [~r/^AzureSDK\.Core\./, AzureSDK.Error],
+        Pipeline: [~r/^AzureSDK\.Pipeline\./]
       ],
       source_url: @source_url,
       source_ref: "v#{@version}"

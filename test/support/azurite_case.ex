@@ -1,4 +1,4 @@
-defmodule ExAzure.AzuriteCase do
+defmodule AzureSDK.AzuriteCase do
   @moduledoc false
 
   use ExUnit.CaseTemplate
@@ -11,7 +11,7 @@ defmodule ExAzure.AzuriteCase do
 
   using do
     quote do
-      import ExAzure.AzuriteCase
+      import AzureSDK.AzuriteCase
 
       @moduletag :azurite
     end
@@ -19,9 +19,9 @@ defmodule ExAzure.AzuriteCase do
 
   def azurite_client(opts \\ []) do
     credential =
-      ExAzure.Identity.SharedKeyCredential.new(@azurite_account, @azurite_key)
+      AzureSDK.Identity.SharedKeyCredential.new(@azurite_account, @azurite_key)
 
-    ExAzure.Storage.Client.new(
+    AzureSDK.Storage.Client.new(
       account: @azurite_account,
       credential: credential,
       endpoint: Keyword.get(opts, :endpoint, @azurite_endpoint)

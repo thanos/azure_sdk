@@ -1,12 +1,12 @@
 # Building SDK Pipelines with Req
 
-Why ExAzure uses Req and how to build SDK pipelines on the BEAM.
+Why AzureSDK uses Req and how to build SDK pipelines on the BEAM.
 
 ## The Problem
 
 Cloud APIs share auth, retry, telemetry, errors, and pooling. Without a pipeline, every function reimplements these.
 
-## ExAzure Pattern
+## AzureSDK Pattern
 
 ```elixir
 def upload(client, container, name, content) do
@@ -25,7 +25,7 @@ Modern Elixir HTTP: composable, Finch pooling, Mint protocol, active maintenance
 Req.request(method: :get, url: url, retry: false)
 ```
 
-ExAzure disables Req retry — Azure-specific codes and `[:ex_azure, :retry]` telemetry need custom logic.
+AzureSDK disables Req retry — Azure-specific codes and `[:azure_sdk, :retry]` telemetry need custom logic.
 
 ## Pipeline Step Example
 
@@ -89,6 +89,6 @@ Integration tests hit Azurite.
 
 ## Further Reading
 
-- [`plans/pipeline-design.md`](https://github.com/thanos/ex_azure/blob/main/plans/pipeline-design.md)
-- [`plans/req-integration.md`](https://github.com/thanos/ex_azure/blob/main/plans/req-integration.md)
+- [`plans/pipeline-design.md`](https://github.com/thanos/azure_sdk/blob/main/plans/pipeline-design.md)
+- [`plans/req-integration.md`](https://github.com/thanos/azure_sdk/blob/main/plans/req-integration.md)
 - `guides/designing_cloud_sdks_on_the_beam.md`

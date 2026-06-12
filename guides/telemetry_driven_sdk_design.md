@@ -1,6 +1,6 @@
 # Telemetry-Driven SDK Design
 
-ExAzure designs telemetry alongside public APIs. This guide covers philosophy, events, and production patterns.
+AzureSDK designs telemetry alongside public APIs. This guide covers philosophy, events, and production patterns.
 
 ## Why Telemetry-First?
 
@@ -10,7 +10,7 @@ ExAzure designs telemetry alongside public APIs. This guide covers philosophy, e
 - Add metrics without library upgrades
 - LiveDashboard, OTel bridges, tests all work
 
-Official Azure SDKs have optional OTel; ExAzure emits events with zero config.
+Official Azure SDKs have optional OTel; AzureSDK emits events with zero config.
 
 ## Two Event Levels
 
@@ -18,48 +18,48 @@ Official Azure SDKs have optional OTel; ExAzure emits events with zero config.
 
 ```elixir
 Telemetry.emit_operation(:blob, :put, %{container: c, name: n})
-# => [:ex_azure, :blob, :put]
+# => [:azure_sdk, :blob, :put]
 ```
 
 **Requests** — what the pipeline executed (includes retries):
 
 ```elixir
 Telemetry.span(metadata, fn -> execute_with_retry(...) end)
-# => [:ex_azure, :request, :start] then [:ex_azure, :request, :stop] with %{duration: native}
+# => [:azure_sdk, :request, :start] then [:azure_sdk, :request, :stop] with %{duration: native}
 ```
 
 ## Event Reference
 
 | Event | When | Metadata |
 |-------|------|----------|
-| `[:ex_azure, :blob, :put]` | upload, upload_stream | `container`, `name` |
-| `[:ex_azure, :blob, :get]` | download | `container`, `name` |
-| `[:ex_azure, :blob, :delete]` | delete | `container`, `name` |
-| `[:ex_azure, :blob, :metadata]` | metadata | `container`, `name` |
-| `[:ex_azure, :blob, :set_metadata]` | set_metadata | `container`, `name` |
-| `[:ex_azure, :container, :*]` | create/delete/list/... | `name` or `container` |
-| `[:ex_azure, :request, :start]` | pipeline span begins | `service`, `operation`, `method`, `path` |
-| `[:ex_azure, :request, :stop]` | pipeline span ends (`%{duration: native}`) | same |
-| `[:ex_azure, :request, :attempt]` | before each HTTP attempt | same |
-| `[:ex_azure, :auth, :sign]` | SharedKey signing | `scheme`, `account` |
-| `[:ex_azure, :retry]` | backoff | `attempt`, `delay_ms` |
+| `[:azure_sdk, :blob, :put]` | upload, upload_stream | `container`, `name` |
+| `[:azure_sdk, :blob, :get]` | download | `container`, `name` |
+| `[:azure_sdk, :blob, :delete]` | delete | `container`, `name` |
+| `[:azure_sdk, :blob, :metadata]` | metadata | `container`, `name` |
+| `[:azure_sdk, :blob, :set_metadata]` | set_metadata | `container`, `name` |
+| `[:azure_sdk, :container, :*]` | create/delete/list/... | `name` or `container` |
+| `[:azure_sdk, :request, :start]` | pipeline span begins | `service`, `operation`, `method`, `path` |
+| `[:azure_sdk, :request, :stop]` | pipeline span ends (`%{duration: native}`) | same |
+| `[:azure_sdk, :request, :attempt]` | before each HTTP attempt | same |
+| `[:azure_sdk, :auth, :sign]` | SharedKey signing | `scheme`, `account` |
+| `[:azure_sdk, :retry]` | backoff | `attempt`, `delay_ms` |
 
 ## Handler Examples
 
 ```elixir
 # Dev logging
-:telemetry.attach("dev", [:ex_azure, :request, :stop], fn _, %{duration: d}, m, _ ->
+:telemetry.attach("dev", [:azure_sdk, :request, :stop], fn _, %{duration: d}, m, _ ->
   ms = System.convert_time_unit(d, :native, :millisecond)
   IO.puts("#{m.service}.#{m.operation} #{ms}ms")
 end, nil)
 
 # Test assertion
-:telemetry_test.attach_event_handlers(self(), [[:ex_azure, :blob, :put]])
+:telemetry_test.attach_event_handlers(self(), [[:azure_sdk, :blob, :put]])
 ```
 
 ## Rules for New Events
 
-1. Name mirrors module: `[:ex_azure, :queue, :send]`
+1. Name mirrors module: `[:azure_sdk, :queue, :send]`
 2. Measurements numeric: `count`, `duration`, `delay_ms`
 3. Metadata contextual, never secrets
 4. Emit operation event before pipeline call
@@ -79,6 +79,6 @@ System.convert_time_unit(d, :native, :millisecond)
 
 ## Further Reading
 
-- [`plans/telemetry-design.md`](https://github.com/thanos/ex_azure/blob/main/plans/telemetry-design.md)
-- [`livebooks/telemetry.livemd`](https://github.com/thanos/ex_azure/blob/main/livebooks/telemetry.livemd)
+- [`plans/telemetry-design.md`](https://github.com/thanos/azure_sdk/blob/main/plans/telemetry-design.md)
+- [`livebooks/telemetry.livemd`](https://github.com/thanos/azure_sdk/blob/main/livebooks/telemetry.livemd)
 - [Telemetry hexdocs](https://hexdocs.pm/telemetry/)

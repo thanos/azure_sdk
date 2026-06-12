@@ -15,7 +15,7 @@ if grep -R -q 'path: "\."' livebooks/; then
 fi
 
 if ! grep -q 'Path\.expand("\.\.", __DIR__)' "${livebooks[@]}"; then
-  echo "livebooks must install ex_azure from the repo root via Path.expand" >&2
+  echo "livebooks must install azure_sdk from the repo root via Path.expand" >&2
   exit 1
 fi
 

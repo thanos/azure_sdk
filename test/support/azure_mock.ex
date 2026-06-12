@@ -1,4 +1,4 @@
-defmodule ExAzure.AzureMock do
+defmodule AzureSDK.AzureMock do
   @moduledoc false
 
   @test_account "mockaccount"
@@ -8,16 +8,16 @@ defmodule ExAzure.AzureMock do
   def key, do: @test_key
 
   def credential do
-    ExAzure.Identity.SharedKeyCredential.new(@test_account, @test_key)
+    AzureSDK.Identity.SharedKeyCredential.new(@test_account, @test_key)
   end
 
   def client(bypass, opts \\ []) do
-    ExAzure.Storage.Client.new(
+    AzureSDK.Storage.Client.new(
       account: Keyword.get(opts, :account, @test_account),
       credential: Keyword.get(opts, :credential, credential()),
       endpoint: endpoint(bypass, Keyword.get(opts, :account, @test_account)),
       api_version: Keyword.get(opts, :api_version, "2021-08-06"),
-      retry: Keyword.get(opts, :retry, ExAzure.Core.Retry.default_policy())
+      retry: Keyword.get(opts, :retry, AzureSDK.Core.Retry.default_policy())
     )
   end
 
