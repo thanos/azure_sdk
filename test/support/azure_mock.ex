@@ -46,8 +46,7 @@ defmodule ExAzure.AzureMock do
 
   def stub_list_containers(bypass, containers \\ ["uploads"]) do
     entries =
-      containers
-      |> Enum.map(fn name ->
+      Enum.map_join(containers, "", fn name ->
         """
         <Container>
           <Name>#{name}</Name>
@@ -58,7 +57,6 @@ defmodule ExAzure.AzureMock do
         </Container>
         """
       end)
-      |> Enum.join()
 
     body = """
     <?xml version="1.0" encoding="utf-8"?>
@@ -74,8 +72,7 @@ defmodule ExAzure.AzureMock do
 
   def stub_list_blobs(bypass, container, blobs \\ ["file.txt"]) do
     entries =
-      blobs
-      |> Enum.map(fn name ->
+      Enum.map_join(blobs, "", fn name ->
         """
         <Blob>
           <Name>#{name}</Name>
@@ -86,7 +83,6 @@ defmodule ExAzure.AzureMock do
         </Blob>
         """
       end)
-      |> Enum.join()
 
     body = """
     <?xml version="1.0" encoding="utf-8"?>
