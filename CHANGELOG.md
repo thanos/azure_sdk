@@ -7,7 +7,7 @@
 - Multi-service architecture with Identity, Data Plane, Management, and Platform layers
 - `ExAzure.Core.Pipeline` — reusable Req-based request pipeline with retry and telemetry
 - Identity plane: `SharedKeyCredential`, `SASCredential`, credential behaviour
-- Blob Storage: upload, download, delete, metadata, listing, streaming helpers
+- Blob Storage: upload, download, delete, metadata, listing, buffered stream helpers
 - Container management: create, delete, list, list blobs, metadata
 - Standardized `ExAzure.Error` struct
 - XML parsers hidden behind public structs and maps

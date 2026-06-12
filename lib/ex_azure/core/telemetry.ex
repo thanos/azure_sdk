@@ -35,10 +35,6 @@ defmodule ExAzure.Core.Telemetry do
     )
   end
 
-  @doc false
-  @spec emit_request(map()) :: :ok
-  def emit_request(metadata), do: emit_attempt(metadata)
-
   @doc """
   Emits an operation telemetry event for a service module.
   """

@@ -76,11 +76,6 @@ defmodule ExAzure.Storage.Client do
   @spec path_style?(t()) :: boolean()
   def path_style?(%__MODULE__{path_style: value}), do: value
 
-  @doc false
-  @deprecated "Use path_style?/1 instead"
-  @spec emulator?(t()) :: boolean()
-  def emulator?(client), do: path_style?(client)
-
   @doc """
   Metadata passed to the signing pipeline for storage requests.
   """

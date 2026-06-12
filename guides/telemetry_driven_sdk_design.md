@@ -25,7 +25,7 @@ Telemetry.emit_operation(:blob, :put, %{container: c, name: n})
 
 ```elixir
 Telemetry.span(metadata, fn -> execute_with_retry(...) end)
-# => [:ex_azure, :request] with %{duration: native}
+# => [:ex_azure, :request, :start] then [:ex_azure, :request, :stop] with %{duration: native}
 ```
 
 ## Event Reference
@@ -38,7 +38,9 @@ Telemetry.span(metadata, fn -> execute_with_retry(...) end)
 | `[:ex_azure, :blob, :metadata]` | metadata | `container`, `name` |
 | `[:ex_azure, :blob, :set_metadata]` | set_metadata | `container`, `name` |
 | `[:ex_azure, :container, :*]` | create/delete/list/... | `name` or `container` |
-| `[:ex_azure, :request]` | pipeline span | `service`, `operation`, `method`, `path` |
+| `[:ex_azure, :request, :start]` | pipeline span begins | `service`, `operation`, `method`, `path` |
+| `[:ex_azure, :request, :stop]` | pipeline span ends (`%{duration: native}`) | same |
+| `[:ex_azure, :request, :attempt]` | before each HTTP attempt | same |
 | `[:ex_azure, :auth, :sign]` | SharedKey signing | `scheme`, `account` |
 | `[:ex_azure, :retry]` | backoff | `attempt`, `delay_ms` |
 
@@ -46,7 +48,7 @@ Telemetry.span(metadata, fn -> execute_with_retry(...) end)
 
 ```elixir
 # Dev logging
-:telemetry.attach("dev", [:ex_azure, :request], fn _, %{duration: d}, m, _ ->
+:telemetry.attach("dev", [:ex_azure, :request, :stop], fn _, %{duration: d}, m, _ ->
   ms = System.convert_time_unit(d, :native, :millisecond)
   IO.puts("#{m.service}.#{m.operation} #{ms}ms")
 end, nil)
