@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Valid pairs per https://hexdocs.pm/elixir/compatibility-and-deprecations.html
+# 1.17–1.18 → OTP 27 only (we dropped OTP 26)
+# 1.19      → OTP 27–28
+# 1.20      → OTP 27–29
+
 jobs:
   quality:
     name: Quality (${{ matrix.elixir }} / OTP ${{ matrix.otp }})
@@ -12,8 +17,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        otp: ["27", "28", "29"]
-        elixir: ["1.17", "1.18", "1.19", "1.20"]
+        include:
+          - elixir: "1.17"
+            otp: "27"
+          - elixir: "1.18"
+            otp: "27"
+          - elixir: "1.19"
+            otp: "27"
+          - elixir: "1.19"
+            otp: "28"
+          - elixir: "1.20"
+            otp: "27"
+          - elixir: "1.20"
+            otp: "28"
+          - elixir: "1.20"
+            otp: "29"
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
@@ -50,8 +68,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        otp: ["27", "28", "29"]
-        elixir: ["1.17", "1.18", "1.19", "1.20"]
+        include:
+          - elixir: "1.17"
+            otp: "27"
+          - elixir: "1.18"
+            otp: "27"
+          - elixir: "1.19"
+            otp: "27"
+          - elixir: "1.19"
+            otp: "28"
+          - elixir: "1.20"
+            otp: "27"
+          - elixir: "1.20"
+            otp: "28"
+          - elixir: "1.20"
+            otp: "29"
     services:
       azurite:
         image: mcr.microsoft.com/azure-storage/azurite
