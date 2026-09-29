@@ -4,7 +4,15 @@
 Mix.install([
   {:azure_sdk, path: Path.expand("..", __DIR__)}
 ])
+```
 
+## Overview
+
+AzureSDK emits Telemetry events for requests, retries, signing, and service
+operations. This notebook attaches handlers, then performs a blob upload against
+Azurite (`docker compose up -d`).
+
+```elixir
 {:ok, stats} = Agent.start_link(fn -> %{attempts: 0, durations: []} end)
 
 :telemetry.attach(
@@ -35,6 +43,8 @@ Mix.install([
   end,
   nil
 )
+
+:ok
 ```
 
 ## Emit events with a blob upload
@@ -54,7 +64,22 @@ client =
   )
 
 container = "telemetry-demo"
-{:ok, _} = AzureSDK.Storage.Container.create(client, container)
+
+unless AzureSDK.Storage.Container.exists?(client, container) do
+  {:ok, _} = AzureSDK.Storage.Container.create(client, container)
+end
+
 {:ok, _} = AzureSDK.Storage.Blob.upload(client, container, "metric.txt", "telemetry")
 Agent.get(stats, & &1)
+```
+
+## Clean up
+
+```elixir
+{:ok, :deleted} = AzureSDK.Storage.Blob.delete(client, container, "metric.txt")
+{:ok, :deleted} = AzureSDK.Storage.Container.delete(client, container)
+:telemetry.detach("ex-azure-attempt")
+:telemetry.detach("ex-azure-stop")
+:telemetry.detach("ex-azure-blob")
+:ok
 ```

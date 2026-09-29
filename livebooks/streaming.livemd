@@ -1,13 +1,19 @@
 # Buffered enumerables with AzureSDK
 
-In v0.1.0, `upload_stream/4` and `download_stream/4` accept enumerables but buffer
-content in memory. Chunked streaming is planned for a future release.
-
 ```elixir
 Mix.install([
   {:azure_sdk, path: Path.expand("..", __DIR__)}
 ])
+```
 
+## Overview
+
+`upload_stream/4` and `download_stream/4` accept enumerables but buffer content in
+memory in the current release. Chunked streaming is planned later.
+
+Requires Azurite (`docker compose up -d`).
+
+```elixir
 credential =
   AzureSDK.Identity.SharedKeyCredential.new(
     "devstoreaccount1",
@@ -22,7 +28,12 @@ client =
   )
 
 container = "stream-demo"
-{:ok, _} = AzureSDK.Storage.Container.create(client, container)
+
+unless AzureSDK.Storage.Container.exists?(client, container) do
+  {:ok, _} = AzureSDK.Storage.Container.create(client, container)
+end
+
+:ok
 ```
 
 ## Stream upload
@@ -30,6 +41,7 @@ container = "stream-demo"
 ```elixir
 stream = Stream.repeatedly(fn -> "chunk" end) |> Stream.take(3)
 {:ok, _} = AzureSDK.Storage.Blob.upload_stream(client, container, "chunks.bin", stream)
+:ok
 ```
 
 ## Stream download
@@ -37,4 +49,12 @@ stream = Stream.repeatedly(fn -> "chunk" end) |> Stream.take(3)
 ```elixir
 {:ok, stream} = AzureSDK.Storage.Blob.download_stream(client, container, "chunks.bin")
 stream |> Enum.join()
+```
+
+## Clean up
+
+```elixir
+{:ok, :deleted} = AzureSDK.Storage.Blob.delete(client, container, "chunks.bin")
+{:ok, :deleted} = AzureSDK.Storage.Container.delete(client, container)
+:ok
 ```

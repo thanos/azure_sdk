@@ -2,14 +2,62 @@ defmodule AzureSDK.Storage.Blob do
   @moduledoc """
   Azure Blob Storage operations.
 
-  Supports binary and iodata uploads and downloads. `upload_stream/4` and
-  `download_stream/4` accept enumerables but buffer content in memory in v0.1.0;
-  chunked streaming is planned for a future release.
+  Binary and iodata uploads/downloads are supported. `upload_stream/4` and
+  `download_stream/4` accept enumerables but buffer content in memory in this
+  release; chunked streaming is planned later.
+
+  ## Blob map
+
+  Successful upload/download returns a map:
+
+      %{
+        container: "uploads",
+        name: "file.txt",
+        properties: %{
+          content_type: "text/plain",
+          content_length: 5,
+          etag: "...",
+          last_modified: "..."
+        },
+        metadata: %{"owner" => "app"},
+        content: "hello"
+      }
+
+  ## Errors
+
+  Failures return `{:error, %AzureSDK.Error{}}` (HTTP errors, auth failures,
+  transport issues after retries). Functions do not raise for Azure failures.
+
+  ## Examples
+
+      credential =
+        AzureSDK.Identity.SharedKeyCredential.new(account, key)
+
+      client =
+        AzureSDK.Storage.Client.new(account: account, credential: credential)
+
+      {:ok, blob} =
+        AzureSDK.Storage.Blob.upload(client, "uploads", "file.txt", "hello",
+          content_type: "text/plain",
+          metadata: %{"owner" => "app"}
+        )
+
+      {:ok, %{content: "hello"}} =
+        AzureSDK.Storage.Blob.download(client, "uploads", "file.txt")
   """
 
   alias AzureSDK.Core.{Pipeline, Request, Response, Telemetry}
   alias AzureSDK.Storage.{Client, Metadata, Path}
 
+  @typedoc """
+  Blob result map.
+
+  * `:container` — container name
+  * `:name` — blob name (may include `/` path segments)
+  * `:properties` — content type, length, etag, last modified
+  * `:metadata` — user metadata (without the `x-ms-meta-` prefix)
+  * `:content` — body bytes when included, otherwise `nil`
+  """
   @type blob :: %{
           container: String.t(),
           name: String.t(),
@@ -20,6 +68,30 @@ defmodule AzureSDK.Storage.Blob do
 
   @doc """
   Uploads a blob from binary or iodata content.
+
+  ## Parameters
+
+  * `client` — `AzureSDK.Storage.Client`
+  * `container` — container name
+  * `name` — blob name (path segments allowed)
+  * `content` — binary or iodata
+  * `opts` — optional keyword list:
+    * `:content_type` — defaults to `"application/octet-stream"`
+    * `:blob_type` — defaults to `"BlockBlob"`
+    * `:metadata` — string-keyed user metadata map
+    * `:include_content` — when `false`, returned `:content` is `nil` (default `true`)
+
+  ## Returns
+
+  * `{:ok, blob()}`
+  * `{:error, %AzureSDK.Error{}}`
+
+  ## Examples
+
+      {:ok, blob} =
+        AzureSDK.Storage.Blob.upload(client, "uploads", "a.txt", "hi",
+          content_type: "text/plain"
+        )
   """
   @spec upload(Client.t(), String.t(), String.t(), iodata(), keyword()) ::
           {:ok, blob()} | {:error, AzureSDK.Error.t()}
@@ -48,7 +120,21 @@ defmodule AzureSDK.Storage.Blob do
   @doc """
   Uploads a blob from an enumerable.
 
-  In v0.1.0 the enumerable is fully materialized in memory before upload.
+  The enumerable is fully materialized in memory before upload.
+
+  ## Parameters
+
+  Same as `upload/5`, with `stream` an `Enumerable` of iodata chunks.
+
+  ## Returns
+
+  * `{:ok, blob()}`
+  * `{:error, %AzureSDK.Error{}}`
+
+  ## Examples
+
+      {:ok, _} =
+        AzureSDK.Storage.Blob.upload_stream(client, "uploads", "a.txt", ["hel", "lo"])
   """
   @spec upload_stream(Client.t(), String.t(), String.t(), Enumerable.t(), keyword()) ::
           {:ok, blob()} | {:error, AzureSDK.Error.t()}
@@ -61,6 +147,24 @@ defmodule AzureSDK.Storage.Blob do
 
   @doc """
   Downloads a blob and returns its content.
+
+  ## Parameters
+
+  * `client` — storage client
+  * `container` — container name
+  * `name` — blob name
+  * `opts` — optional:
+    * `:include_content` — when `false`, `:content` is `nil` (default `true`)
+
+  ## Returns
+
+  * `{:ok, blob()}`
+  * `{:error, %AzureSDK.Error{}}` — including 404 when the blob is missing
+
+  ## Examples
+
+      {:ok, %{content: body}} =
+        AzureSDK.Storage.Blob.download(client, "uploads", "a.txt")
   """
   @spec download(Client.t(), String.t(), String.t(), keyword()) ::
           {:ok, blob()} | {:error, AzureSDK.Error.t()}
@@ -85,8 +189,18 @@ defmodule AzureSDK.Storage.Blob do
   @doc """
   Downloads a blob as an enumerable.
 
-  In v0.1.0 the full blob is downloaded into memory first, then exposed as a
-  single-chunk enumerable. Chunked streaming is planned for a future release.
+  The full blob is downloaded into memory first, then exposed as a single-chunk
+  enumerable.
+
+  ## Returns
+
+  * `{:ok, Enumerable.t()}`
+  * `{:error, %AzureSDK.Error{}}`
+
+  ## Examples
+
+      {:ok, stream} = AzureSDK.Storage.Blob.download_stream(client, "uploads", "a.txt")
+      IO.iodata_to_binary(Enum.to_list(stream))
   """
   @spec download_stream(Client.t(), String.t(), String.t(), keyword()) ::
           {:ok, Enumerable.t()} | {:error, AzureSDK.Error.t()}
@@ -106,6 +220,15 @@ defmodule AzureSDK.Storage.Blob do
 
   @doc """
   Deletes a blob.
+
+  ## Returns
+
+  * `{:ok, :deleted}`
+  * `{:error, %AzureSDK.Error{}}`
+
+  ## Examples
+
+      {:ok, :deleted} = AzureSDK.Storage.Blob.delete(client, "uploads", "a.txt")
   """
   @spec delete(Client.t(), String.t(), String.t(), keyword()) ::
           {:ok, :deleted} | {:error, AzureSDK.Error.t()}
@@ -128,7 +251,16 @@ defmodule AzureSDK.Storage.Blob do
   end
 
   @doc """
-  Returns blob metadata.
+  Returns blob user metadata (keys without the `x-ms-meta-` prefix).
+
+  ## Returns
+
+  * `{:ok, map()}`
+  * `{:error, %AzureSDK.Error{}}`
+
+  ## Examples
+
+      {:ok, meta} = AzureSDK.Storage.Blob.metadata(client, "uploads", "a.txt")
   """
   @spec metadata(Client.t(), String.t(), String.t(), keyword()) ::
           {:ok, map()} | {:error, AzureSDK.Error.t()}
@@ -154,6 +286,20 @@ defmodule AzureSDK.Storage.Blob do
   Sets blob metadata. Replaces all existing metadata keys.
 
   Returns the metadata that was set.
+
+  ## Parameters
+
+  * `metadata` — string-keyed map of user metadata values
+
+  ## Returns
+
+  * `{:ok, map()}` — the metadata that was written
+  * `{:error, %AzureSDK.Error{}}`
+
+  ## Examples
+
+      {:ok, %{"owner" => "app"}} =
+        AzureSDK.Storage.Blob.set_metadata(client, "uploads", "a.txt", %{"owner" => "app"})
   """
   @spec set_metadata(Client.t(), String.t(), String.t(), map(), keyword()) ::
           {:ok, map()} | {:error, AzureSDK.Error.t()}

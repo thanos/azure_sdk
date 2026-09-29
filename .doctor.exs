@@ -10,6 +10,7 @@
     AzureSDK.Integrations.Flow,
     AzureSDK.Integrations.Livebook,
     AzureSDK.Integrations.Nx,
+    AzureSDK.Management.Client,
     AzureSDK.Management.Network,
     AzureSDK.Management.Policy,
     AzureSDK.Management.Replication,

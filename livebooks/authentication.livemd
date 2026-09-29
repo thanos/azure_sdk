@@ -2,11 +2,46 @@
 
 ```elixir
 Mix.install([
-  {:azure_sdk, path: Path.expand("..", __DIR__)}
+  {:azure_sdk, path: Path.expand("..", __DIR__)},
+  {:plug, "~> 1.6"}
 ])
 ```
 
-## Shared Key
+## Introduction
+
+Request credentials (Shared Key, SAS) run against Azurite. Token credentials
+(Entra ID) acquire tokens from Microsoft's identity platform, not from Azurite.
+
+Azurite vs Entra:
+
+* Azurite emulates Storage (Blob/Queue/Table). Shared Key and SAS work locally.
+* Azurite is not an identity provider. It does not host `login.microsoftonline.com`
+  or simulate `ClientSecretCredential` token exchange.
+* Azurite can accept Bearer JWTs on storage requests when started with
+  `--oauth basic` and HTTPS, but the token still comes from real Entra (or the
+  Req `plug:` mock in the Client secret cell below).
+## Azurite check
+
+Start the emulator before the Shared Key section:
+
+```bash
+docker compose up -d
+```
+
+```elixir
+case :gen_tcp.connect(~c"127.0.0.1", 10_000, [:binary, active: false], 500) do
+  {:ok, socket} ->
+    :gen_tcp.close(socket)
+    :azurite_ok
+
+  {:error, _} ->
+    "Start Azurite: docker compose up -d"
+end
+```
+
+## Shared Key (Azurite)
+
+Works locally with the well-known devstore account key.
 
 ```elixir
 shared_key =
@@ -22,14 +57,140 @@ client =
     endpoint: "http://127.0.0.1:10000/devstoreaccount1"
   )
 
-{:ok, containers} = AzureSDK.Storage.Container.list(client)
-length(containers)
+case :gen_tcp.connect(~c"127.0.0.1", 10_000, [:binary, active: false], 500) do
+  {:ok, socket} ->
+    :gen_tcp.close(socket)
+
+    {:ok, containers} = AzureSDK.Storage.Container.list(client)
+    {:shared_key, length(containers)}
+
+  {:error, _} ->
+    {:shared_key, :azurite_not_running}
+end
 ```
 
 ## SAS credential
 
+Parses a SAS token into query parameters (no network call).
+
 ```elixir
-# SAS tokens are applied as query parameters by AzureSDK.Pipeline.SAS
-sas = AzureSDK.Identity.SASCredential.new("sv=2021-06-08&ss=b&srt=sco&sp=rwdlacup&se=2030-01-01T00:00:00Z&sig=example")
-sas.params["sv"]
+sas =
+  AzureSDK.Identity.SASCredential.new(
+    "sv=2021-06-08&ss=b&srt=sco&sp=rwdlacup&se=2030-01-01T00:00:00Z&sig=example"
+  )
+
+{:sas, sas.params["sv"]}
 ```
+
+## Client secret (Entra ID)
+
+`ClientSecretCredential` POSTs to `{authority}/{tenant}/oauth2/v2.0/token` —
+Microsoft Entra, not Azurite.
+
+When `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET` are set,
+this cell uses your real tenant. Otherwise it uses Req's in-memory `plug:` mock
+(Bypass only works inside ExUnit, not Livebook).
+
+```elixir
+present? = fn
+  nil -> false
+  "" -> false
+  value -> String.trim(value) != ""
+end
+
+tenant = System.get_env("AZURE_TENANT_ID")
+client_id = System.get_env("AZURE_CLIENT_ID")
+client_secret = System.get_env("AZURE_CLIENT_SECRET")
+
+use_live? = present?.(tenant) and present?.(client_id) and present?.(client_secret)
+
+fetch_token = fn credential, req_options ->
+  AzureSDK.Identity.TokenCredential.get_token(
+    credential,
+    ["https://storage.azure.com/.default"],
+    req_options: req_options
+  )
+end
+
+if use_live? do
+  credential =
+    AzureSDK.Identity.ClientSecretCredential.new(
+      tenant_id: tenant,
+      client_id: client_id,
+      client_secret: client_secret
+    )
+
+  case fetch_token.(credential, []) do
+    {:ok, token} ->
+      {:client_secret, :live, byte_size(token.token), token.expires_at}
+
+    {:error, error} ->
+      {:client_secret, :live_error, error.code, error.message}
+  end
+else
+  mock_plug = fn conn ->
+    conn
+    |> Plug.Conn.put_resp_content_type("application/json")
+    |> Plug.Conn.resp(
+      200,
+      Jason.encode!(%{
+        "access_token" => "mock-token-from-plug",
+        "expires_in" => 3600,
+        "token_type" => "Bearer"
+      })
+    )
+  end
+
+  credential =
+    AzureSDK.Identity.ClientSecretCredential.new(
+      tenant_id: "demo-tenant",
+      client_id: "demo-client",
+      client_secret: "demo-secret",
+      authority_host: "http://login.example.com"
+    )
+
+  case fetch_token.(credential, plug: mock_plug) do
+    {:ok, token} ->
+      {:client_secret, :mocked_entra, byte_size(token.token), token.expires_at}
+
+    {:error, error} ->
+      {:client_secret, :mock_error, error.code, error.message}
+  end
+end
+```
+
+## DefaultAzureCredential
+
+Builds a chain: Environment → Workload Identity (when configured) → Managed Identity.
+
+On a typical laptop with no Azure env vars and no IMDS endpoint, `get_token/2`
+returns `CredentialUnavailable` after a short managed-identity probe.
+
+```elixir
+credential = AzureSDK.Identity.DefaultAzureCredential.new()
+
+case AzureSDK.Identity.TokenCredential.get_token(
+       credential,
+       ["https://storage.azure.com/.default"]
+     ) do
+  {:ok, token} ->
+    {:default_azure_credential, :ok, byte_size(token.token)}
+
+  {:error, %{code: code, message: message}} ->
+    {:default_azure_credential, code, message}
+end
+```
+
+## Using a Bearer token against storage
+
+After `get_token/3`, the pipeline applies `Authorization: Bearer …`. Against a
+real Azure Blob Storage account, pass a token credential to
+`Storage.Client.new/1`.
+
+Azurite accepts Bearer tokens only when started with OAuth + HTTPS
+(`azurite --oauth basic --cert … --key …`). This repo's `docker-compose.yml`
+uses plain HTTP + Shared Key, so Bearer against local Azurite is out of scope
+here.
+
+For local development, prefer Shared Key against Azurite (sections above). Use
+Entra credentials when targeting a real storage account in Azure.

@@ -1,7 +1,4 @@
 defmodule AzureSDK.Storage.Queue do
-  @moduledoc """
-  Azure Queue Storage client namespace.
-
-  Planned for v0.3.0. See `plans/roadmap.md`.
-  """
+  @moduledoc false
+  # Namespace reserved for v0.4.0 Queue Storage. See README.md#roadmap.
 end

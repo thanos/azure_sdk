@@ -1,7 +1,4 @@
 defmodule AzureSDK.Management.StorageAccount do
-  @moduledoc """
-  Storage account management operations.
-
-  Planned for v0.5.0 with create, delete, list, keys, lifecycle, and replication APIs.
-  """
+  @moduledoc false
+  # Namespace reserved for v0.6.0. See README.md#roadmap.
 end

@@ -1,7 +1,27 @@
 defmodule AzureSDK.Storage.Metadata do
-  @moduledoc false
+  @moduledoc """
+  Helpers for Azure Storage user-defined metadata headers (`x-ms-meta-*`).
 
-  @doc false
+  ## Examples
+
+      iex> AzureSDK.Storage.Metadata.headers(%{"owner" => "team"})
+      %{"x-ms-meta-owner" => "team"}
+  """
+
+  @doc """
+  Converts a metadata map into `x-ms-meta-*` request headers.
+
+  Values are stringified with `to_string/1`.
+
+  ## Parameters
+
+  * `metadata` — map of metadata key to value
+
+  ## Examples
+
+      iex> AzureSDK.Storage.Metadata.headers(%{env: :prod})
+      %{"x-ms-meta-env" => "prod"}
+  """
   @spec headers(map()) :: %{String.t() => String.t()}
   def headers(metadata) when is_map(metadata) do
     metadata
@@ -9,7 +29,21 @@ defmodule AzureSDK.Storage.Metadata do
     |> Map.new()
   end
 
-  @doc false
+  @doc """
+  Extracts user metadata from response headers into a string-keyed map.
+
+  Header names are matched case-insensitively. The `x-ms-meta-` prefix is
+  stripped from keys.
+
+  ## Parameters
+
+  * `headers` — response header map
+
+  ## Examples
+
+      iex> AzureSDK.Storage.Metadata.from_headers(%{"x-ms-meta-Owner" => "team", "etag" => "1"})
+      %{"owner" => "team"}
+  """
   @spec from_headers(map()) :: map()
   def from_headers(headers) when is_map(headers) do
     headers

@@ -1,7 +1,4 @@
 defmodule AzureSDK.Storage.FileShare do
-  @moduledoc """
-  Azure File Share client namespace.
-
-  Planned for a future release. See `plans/roadmap.md`.
-  """
+  @moduledoc false
+  # Namespace reserved for a future release. See README.md#roadmap.
 end

@@ -1,12 +1,13 @@
 defmodule AzureSDK.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
   @source_url "https://github.com/thanos/azure_sdk"
 
   def project do
     [
       app: :azure_sdk,
+      aliases: [verify: &verify/1],
       version: @version,
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
@@ -38,7 +39,8 @@ defmodule AzureSDK.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, :crypto, :ssl]
+      extra_applications: [:logger, :crypto, :ssl],
+      mod: {AzureSDK.Application, []}
     ]
   end
 
@@ -47,6 +49,7 @@ defmodule AzureSDK.MixProject do
       {:req, "~> 0.5"},
       {:sweet_xml, "~> 0.7"},
       {:telemetry, "~> 1.3"},
+      {:jason, "~> 1.4"},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
@@ -75,6 +78,7 @@ defmodule AzureSDK.MixProject do
         "CHANGELOG.md",
         "guides/azure_for_elixir_developers.md",
         "guides/identity_vs_data_plane.md",
+        "guides/azure_identity.md",
         "guides/migrating_from_azurex.md",
         "guides/telemetry_driven_sdk_design.md",
         "guides/building_sdk_pipelines_with_req.md",
@@ -86,6 +90,7 @@ defmodule AzureSDK.MixProject do
         "Using Azure SDK": [
           "guides/azure_for_elixir_developers.md",
           "guides/identity_vs_data_plane.md",
+          "guides/azure_identity.md",
           "guides/migrating_from_azurex.md",
           "guides/telemetry_driven_sdk_design.md"
         ],
@@ -105,5 +110,34 @@ defmodule AzureSDK.MixProject do
       source_url: @source_url,
       source_ref: "v#{@version}"
     ]
+  end
+
+  defp verify(_) do
+    steps = [
+      {"compile --warnings-as-errors", :dev},
+      {"format --check-formatted", :dev},
+      {"credo --strict", :dev},
+      {"doctor --full", :dev},
+      {"sobelow --config", :dev},
+      {"dialyzer", :dev},
+      {"test --cover", :test},
+      {"docs --warnings-as-errors", :dev}
+    ]
+
+    Enum.each(steps, fn {task, env} ->
+      Mix.shell().info([:bright, "==> mix #{task}", :reset])
+
+      {_, exit_code} =
+        System.cmd("mix", String.split(task),
+          env: [{"MIX_ENV", to_string(env)}],
+          into: IO.stream()
+        )
+
+      if exit_code != 0 do
+        Mix.raise("mix #{task} failed (exit code #{exit_code})")
+      end
+    end)
+
+    Mix.shell().info([:green, :bright, "\nAll verification checks passed!", :reset])
   end
 end

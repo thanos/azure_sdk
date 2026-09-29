@@ -4,7 +4,7 @@ defmodule AzureSDK.Identity.SharedKeyCredentialTest do
   alias AzureSDK.Core.Request
   alias AzureSDK.Identity.{Credential, SharedKeyCredential}
 
-  test "signs through credential behaviour" do
+  test "authorizes through credential behaviour" do
     credential =
       SharedKeyCredential.new("account", Base.encode64("password-password-password-password"))
 
@@ -16,8 +16,7 @@ defmodule AzureSDK.Identity.SharedKeyCredentialTest do
         metadata: %{api_version: "2021-08-06", path_style: true}
       )
 
-    signed = Credential.sign_request(credential, request)
-
+    assert {:ok, signed} = Credential.authorize_request(credential, request)
     assert signed.headers["Authorization"] =~ "SharedKey account:"
     assert signed.headers["x-ms-date"]
   end

@@ -1,7 +1,4 @@
 defmodule AzureSDK.Storage.DataLake do
-  @moduledoc """
-  Azure Data Lake Storage client namespace.
-
-  Planned for a future release. See `plans/roadmap.md`.
-  """
+  @moduledoc false
+  # Namespace reserved for a future release. See README.md#roadmap.
 end

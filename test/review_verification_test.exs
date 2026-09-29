@@ -286,8 +286,8 @@ defmodule ReviewVerificationTest do
     assert AzureSDK.version() == to_string(Mix.Project.config()[:version])
   end
 
-  # F-23: stub credentials raise RuntimeError, not ArgumentError
-  test "F-23: stub credentials raise RuntimeError" do
+  # F-23: ClientSecretCredential is a TokenCredential (no Credential.sign_request)
+  test "F-23: token credentials expose get_token/3" do
     cred =
       AzureSDK.Identity.ClientSecretCredential.new(
         tenant_id: "t",
@@ -295,10 +295,11 @@ defmodule ReviewVerificationTest do
         client_secret: "s"
       )
 
-    request = AzureSDK.Core.Request.new(method: :get, path: "/")
+    assert AzureSDK.Identity.TokenCredential.token_credential?(
+             AzureSDK.Identity.ClientSecretCredential
+           )
 
-    assert_raise RuntimeError, fn ->
-      AzureSDK.Identity.Credential.sign_request(cred, request)
-    end
+    assert function_exported?(AzureSDK.Identity.ClientSecretCredential, :get_token, 3)
+    assert is_tuple(AzureSDK.Identity.TokenCredential.cache_key(cred))
   end
 end
