@@ -43,7 +43,9 @@ The pipeline:
 credential = AzureSDK.Identity.DefaultAzureCredential.new()
 ```
 
-Tries Environment → Workload Identity → Managed Identity.
+Tries `EnvironmentCredential` then `ManagedIdentityCredential`. Environment
+already covers client-secret and workload-identity when the matching env vars
+are set.
 
 Environment variables:
 
