@@ -40,7 +40,7 @@ Merged on every call: `base |> merge(client.req_options) |> merge(per_request_op
 
 ### Retry Disabled
 
-`retry: false` — AzureSDK handles 408/429/5xx with `[:azure_sdk, :retry]` telemetry. Double retry causes unpredictable behavior.
+`retry: false` - AzureSDK handles 408/429/5xx with `[:azure_sdk, :retry]` telemetry. Double retry causes unpredictable behavior.
 
 ### Body vs Stream
 
@@ -83,5 +83,5 @@ Test minor updates against Azurite integration suite.
 
 ## Related Documents
 
-- `pipeline-design.md` — where Req fits in the chain
-- `guides/building_sdk_pipelines_with_req.md` — educational guide
+- `pipeline-design.md` - where Req fits in the chain
+- `guides/building_sdk_pipelines_with_req.md` - educational guide

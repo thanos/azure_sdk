@@ -5,15 +5,19 @@ defmodule AzureSDK.Core.Retry do
   Retries HTTP 408, 429, and 5xx with exponential backoff, optional full jitter,
   and `Retry-After` / `x-ms-retry-after-ms` when present.
 
-  Transport errors are retried only when the request is idempotent
-  (`metadata.idempotent != false`). Authorization failures are not retried here.
+  HTTP 429 and 503 mean the service did not process the request, so they are
+  always retried. HTTP 408, 500, 502 and 504 may arrive after the request took
+  effect, so they are retried only for idempotent requests, as are transport
+  errors (see `idempotent?/1`). Authorization failures are not retried here.
 
   ## Policy fields
 
-  * `:max_attempts` — maximum attempts including the first try
-  * `:base_delay_ms` — base delay for exponential backoff
-  * `:max_delay_ms` — upper bound for computed delays
-  * `:jitter` — when `true`, delay is uniform in `0..capped`
+  * `:max_attempts` - maximum attempts including the first try
+  * `:base_delay_ms` - base delay for exponential backoff
+  * `:max_delay_ms` - upper bound for computed delays
+  * `:jitter` - when `true`, delay is uniform in `0..capped`
+  * `:max_retry_after_ms` - upper bound for server-requested `Retry-After`
+    delays (default `60_000`); larger requests are clamped to this value
 
   ## Examples
 
@@ -27,14 +31,16 @@ defmodule AzureSDK.Core.Retry do
 
   @default_max_attempts 3
   @default_base_delay_ms 200
+  @default_max_retry_after_ms 60_000
 
   @typedoc "Retry policy map. See the module documentation for field meanings."
-  @opaque policy :: %{
-            max_attempts: pos_integer(),
-            base_delay_ms: pos_integer(),
-            max_delay_ms: pos_integer(),
-            jitter: boolean()
-          }
+  @type policy :: %{
+          required(:max_attempts) => pos_integer(),
+          required(:base_delay_ms) => non_neg_integer(),
+          required(:max_delay_ms) => non_neg_integer(),
+          optional(:jitter) => boolean(),
+          optional(:max_retry_after_ms) => non_neg_integer()
+        }
 
   @doc """
   Returns the default retry policy.
@@ -42,15 +48,18 @@ defmodule AzureSDK.Core.Retry do
   ## Examples
 
       iex> AzureSDK.Core.Retry.default_policy()
-      %{max_attempts: 3, base_delay_ms: 200, max_delay_ms: 5000, jitter: true}
+      %{max_attempts: 3, base_delay_ms: 200, max_delay_ms: 5000, jitter: true, max_retry_after_ms: 60000}
   """
+  # The success typing is the literal map; the public contract is policy().
+  @dialyzer {:nowarn_function, default_policy: 0}
   @spec default_policy() :: policy()
   def default_policy do
     %{
       max_attempts: @default_max_attempts,
       base_delay_ms: @default_base_delay_ms,
       max_delay_ms: 5_000,
-      jitter: true
+      jitter: true,
+      max_retry_after_ms: @default_max_retry_after_ms
     }
   end
 
@@ -70,6 +79,27 @@ defmodule AzureSDK.Core.Retry do
       do: true
 
   def retryable?(_), do: false
+
+  @doc """
+  Returns `true` when a failed HTTP response should be retried for this request.
+
+  429 and 503 are always retried. 408, 500, 502 and 504 are retried only when
+  the request is idempotent.
+
+  ## Examples
+
+      iex> post = AzureSDK.Core.Request.new(method: :post, metadata: %{idempotent: false})
+      iex> AzureSDK.Core.Retry.retry_response?(post, %AzureSDK.Core.Response{status: 503})
+      true
+      iex> AzureSDK.Core.Retry.retry_response?(post, %AzureSDK.Core.Response{status: 500})
+      false
+  """
+  @spec retry_response?(Request.t(), Response.t()) :: boolean()
+  def retry_response?(%Request{}, %Response{status: status}) when status in [429, 503], do: true
+
+  def retry_response?(%Request{} = request, %Response{} = response) do
+    retryable?(response) and idempotent?(request)
+  end
 
   @doc """
   Returns `true` when a transport error should be retried for this request.
@@ -138,7 +168,8 @@ defmodule AzureSDK.Core.Retry do
   Computes delay, preferring `Retry-After` / `x-ms-retry-after-ms` when present.
 
   Integer `Retry-After` values are treated as seconds. Non-integer HTTP-date
-  values fall back to exponential backoff.
+  values fall back to exponential backoff. Server-requested delays are capped
+  by `:max_retry_after_ms`, not `:max_delay_ms`.
 
   ## Examples
 
@@ -153,31 +184,22 @@ defmodule AzureSDK.Core.Retry do
   def delay_ms(policy, attempt, %Response{headers: headers}) do
     case retry_after_ms(headers) do
       nil -> delay_ms(policy, attempt)
-      ms -> min(ms, policy.max_delay_ms)
+      ms -> min(ms, Map.get(policy, :max_retry_after_ms, @default_max_retry_after_ms))
     end
   end
 
   @doc """
   Sleeps for the computed backoff and emits `[:azure_sdk, :retry]` telemetry.
 
-  Prefer calling this from the pipeline rather than application code. Sleeps
-  the current process; avoid long delays in latency-sensitive paths.
+  `AzureSDK.Core.Pipeline` calls this between attempts. It blocks the calling
+  process for the delay.
 
   ## Parameters
 
-  * `policy` — retry policy
-  * `attempt` — 1-based attempt that just failed
-  * `metadata` — telemetry metadata map
-  * `response` — optional failed response for Retry-After parsing (`nil` for transport errors)
-
-  ## Returns
-
-  `:ok` after sleeping.
-
-  ## Examples
-
-  Used by `AzureSDK.Core.Pipeline` between attempts; not typically called from
-  application code.
+  * `policy` - retry policy
+  * `attempt` - 1-based attempt that just failed
+  * `metadata` - telemetry metadata map
+  * `response` - optional failed response for Retry-After parsing (`nil` for transport errors)
   """
   @spec backoff(policy(), pos_integer(), map()) :: :ok
   def backoff(policy, attempt, metadata) do

@@ -16,7 +16,7 @@ defmodule AzureSDK.Storage.Path do
 
   ## Parameters
 
-  * `segment` — container name, blob name segment, or similar
+  * `segment` - container name, blob name segment, or similar
 
   ## Examples
 
@@ -35,7 +35,7 @@ defmodule AzureSDK.Storage.Path do
 
   ## Parameters
 
-  * `segments` — list of path segments in order
+  * `segments` - list of path segments in order
 
   ## Examples
 

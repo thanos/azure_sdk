@@ -3,7 +3,7 @@ defmodule AzureSDK do
   AzureSDK is a long-term Azure platform SDK for Elixir and Erlang.
 
   v0.2.0 adds Entra ID / OAuth credentials, a supervised token cache,
-  fallible authorization, and production-oriented retry semantics on top of
+  fallible authorization, and idempotency-aware retries on top of
   the Blob Storage foundation.
 
   ## Quick start

@@ -4,10 +4,10 @@ AzureSDK emits `:telemetry` events on every operation, request, signing event, a
 
 ## Principles
 
-1. **Two-level events** — operations (user calls) and requests (pipeline executes).
-2. **Consistent metadata** — `service`, `operation`, resource identifiers.
-3. **Native time duration** — convert in handlers.
-4. **No secrets** — never emit keys, SAS sigs, or tokens.
+1. **Two-level events** - operations (user calls) and requests (pipeline executes).
+2. **Consistent metadata** - `service`, `operation`, resource identifiers.
+3. **Native time duration** - convert in handlers.
+4. **No secrets** - never emit keys, SAS sigs, or tokens.
 
 ## Event Catalog
 
@@ -100,6 +100,6 @@ end, nil)
 
 ## Related Documents
 
-- `guides/telemetry_driven_sdk_design.md` — philosophy
-- `guides/azure_identity.md` — token cache events
-- `pipeline-design.md` — where events fire
+- `guides/telemetry_driven_sdk_design.md` - philosophy
+- `guides/azure_identity.md` - token cache events
+- `pipeline-design.md` - where events fire

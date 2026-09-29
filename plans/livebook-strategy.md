@@ -4,10 +4,10 @@ AzureSDK uses [Livebook](https://livebook.dev) as a primary onboarding medium. N
 
 ## Goals
 
-1. Every notebook runs — CI validates execution.
-2. Teach by doing — readers execute code immediately.
-3. Complement `guides/` — notebooks show how, guides explain why.
-4. Azurite-first — no cloud credentials in notebooks.
+1. Every notebook runs - CI validates execution.
+2. Teach by doing - readers execute code immediately.
+3. Complement `guides/` - notebooks show how, guides explain why.
+4. Azurite-first - no cloud credentials in notebooks.
 
 ## Notebook Catalog
 
@@ -44,7 +44,7 @@ client = Storage.Client.new(
 
 ## Integration Module
 
-`AzureSDK.Integrations.Livebook` — Azurite health check, client factory, telemetry Kino renderer, unique name generator. Expand as notebooks grow.
+`AzureSDK.Integrations.Livebook` - Azurite health check, client factory, telemetry Kino renderer, unique name generator. Expand as notebooks grow.
 
 ## CI Validation
 

@@ -4,14 +4,14 @@ defmodule AzureSDK.Core.Telemetry do
 
   ## Events
 
-  * `[:azure_sdk, :request, :start]` — pipeline span started
-  * `[:azure_sdk, :request, :stop]` — pipeline span finished with duration
-  * `[:azure_sdk, :request, :attempt]` — emitted before each HTTP attempt
-  * `[:azure_sdk, :auth, :sign]` — emitted when a request is signed
-  * `[:azure_sdk, :auth, :token_cache, :hit | :miss]` — token cache lookups
-  * `[:azure_sdk, :auth, :token, :acquire]` — token acquisition duration
-  * `[:azure_sdk, :retry]` — emitted on retry backoff
-  * `[:azure_sdk, :blob, :put | :get | :delete | ...]` — service operations
+  * `[:azure_sdk, :request, :start]` - pipeline span started
+  * `[:azure_sdk, :request, :stop]` - pipeline span finished with duration
+  * `[:azure_sdk, :request, :attempt]` - emitted before each HTTP attempt
+  * `[:azure_sdk, :auth, :sign]` - emitted when a request is signed
+  * `[:azure_sdk, :auth, :token_cache, :hit | :miss]` - token cache lookups
+  * `[:azure_sdk, :auth, :token, :acquire]` - token acquisition duration
+  * `[:azure_sdk, :retry]` - emitted on retry backoff
+  * `[:azure_sdk, :blob, :put | :get | :delete | ...]` - service operations
 
   ## Attach example
 
@@ -30,11 +30,7 @@ defmodule AzureSDK.Core.Telemetry do
 
   ## Parameters
 
-  * `metadata` — map with at least `:service`, `:operation`, `:method`, `:path`
-
-  ## Returns
-
-  `:ok`
+  * `metadata` - map with at least `:service`, `:operation`, `:method`, `:path`
 
   ## Examples
 
@@ -55,13 +51,9 @@ defmodule AzureSDK.Core.Telemetry do
 
   ## Parameters
 
-  * `service` — service atom (for example `:blob` or `:container`)
-  * `operation` — operation atom (for example `:put`)
-  * `metadata` — additional metadata map
-
-  ## Returns
-
-  `:ok`
+  * `service` - service atom (for example `:blob` or `:container`)
+  * `operation` - operation atom (for example `:put`)
+  * `metadata` - additional metadata map
 
   ## Examples
 
@@ -82,11 +74,7 @@ defmodule AzureSDK.Core.Telemetry do
 
   ## Parameters
 
-  * `metadata` — typically includes `:scheme`, `:service`, `:operation`
-
-  ## Returns
-
-  `:ok`
+  * `metadata` - typically includes `:scheme`, `:service`, `:operation`
 
   ## Examples
 
@@ -107,12 +95,8 @@ defmodule AzureSDK.Core.Telemetry do
 
   ## Parameters
 
-  * `kind` — `:hit` or `:miss`
-  * `metadata` — additional metadata
-
-  ## Returns
-
-  `:ok`
+  * `kind` - `:hit` or `:miss`
+  * `metadata` - additional metadata
 
   ## Examples
 
@@ -136,8 +120,8 @@ defmodule AzureSDK.Core.Telemetry do
 
   ## Parameters
 
-  * `metadata` — request metadata map
-  * `fun` — zero-arity function
+  * `metadata` - request metadata map
+  * `fun` - zero-arity function
 
   ## Returns
 

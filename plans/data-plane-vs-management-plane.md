@@ -11,7 +11,7 @@ Azure exposes two API surfaces. AzureSDK mirrors this in module structure, clien
 
 ## AzureSDK Module Mapping
 
-### Data Plane — `AzureSDK.Storage.*`
+### Data Plane - `AzureSDK.Storage.*`
 
 | Module | Status |
 |--------|--------|
@@ -20,11 +20,11 @@ Azure exposes two API surfaces. AzureSDK mirrors this in module structure, clien
 
 `Storage.Client` config: `account`, `endpoint`, `api_version` (default `2024-11-04`).
 
-### Management Plane — `AzureSDK.Management.*`
+### Management Plane - `AzureSDK.Management.*`
 
 | Module | Status |
 |--------|--------|
-| `Client`, `StorageAccount`, `Policy`, `Network`, `Replication` | Stubs (v0.5.0) |
+| `Client`, `StorageAccount`, `Policy`, `Network`, `Replication` | Stubs (v0.6.0) |
 
 `Management.Client` config: `subscription_id`, `endpoint`, `api_version`.
 
@@ -32,7 +32,7 @@ Azure exposes two API surfaces. AzureSDK mirrors this in module structure, clien
 
 **Data (v0.1.0):** `SharedKeyCredential` → HMAC via `Pipeline.SharedKey`; `SASCredential` → query params.
 
-**Management (v0.5.0):** OAuth2 only via `ClientSecretCredential` or `ManagedIdentityCredential` (v0.2.0). Scope: `https://management.azure.com/.default`.
+**Management (v0.6.0):** OAuth2 only via `ClientSecretCredential` or `ManagedIdentityCredential` (v0.2.0). Scope: `https://management.azure.com/.default`.
 
 ## Request Differences
 
@@ -61,7 +61,7 @@ Management.StorageAccount.create(mgmt, "rg", "newaccount", location: "eastus")
 
 Both planes produce `Core.Request` and call `Pipeline.run/3`. Signing is credential-driven, not plane-driven.
 
-Management additions (v0.5.0): `Pipeline.LRO` polling, JSON bodies, ARM URL builder.
+Management additions (v0.6.0): `Pipeline.LRO` polling, JSON bodies, ARM URL builder.
 
 ## Why One SDK
 
@@ -69,6 +69,6 @@ Microsoft ships separate data and mgmt packages sharing `azure-core` and `azure-
 
 ## Related Documents
 
-- `identity-architecture.md` — credentials per plane
-- `guides/management_plane_design.md` — ARM patterns
-- `README.md` (Roadmap) — v0.5.0 timeline
+- `identity-architecture.md` - credentials per plane
+- `guides/management_plane_design.md` - ARM patterns
+- `README.md` (Roadmap) - v0.6.0 timeline

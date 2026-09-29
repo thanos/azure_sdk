@@ -7,7 +7,8 @@ defmodule AzureSDK.Identity.SASCredential do
 
   ## Fields
 
-  * `:params` — string-keyed SAS query parameters
+  * `:params` - string-keyed SAS query parameters (hidden from `inspect/2`
+    because they include the signature)
 
   ## Examples
 
@@ -21,6 +22,7 @@ defmodule AzureSDK.Identity.SASCredential do
   @typedoc "SAS credential. See the module documentation for field meanings."
   @type t :: %__MODULE__{params: %{String.t() => String.t()}}
 
+  @derive {Inspect, except: [:params]}
   defstruct [:params]
 
   @doc """
@@ -28,7 +30,7 @@ defmodule AzureSDK.Identity.SASCredential do
 
   ## Parameters
 
-  * `token_or_params` — SAS query string (optional leading `?`) or map of params
+  * `token_or_params` - SAS query string (optional leading `?`) or map of params
 
   ## Returns
 

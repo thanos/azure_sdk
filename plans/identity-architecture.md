@@ -1,12 +1,12 @@
 # Identity Plane Architecture
 
-Authentication is a first-class subsystem. Storage modules never compute signatures — credentials plug into `AzureSDK.Core.Pipeline`.
+Authentication is a first-class subsystem. Storage modules never compute signatures - credentials plug into `AzureSDK.Core.Pipeline`.
 
 ## Principles
 
 1. Credentials authorize requests; services do not.
 2. Two behaviours: request credentials (`Credential`) and token credentials (`TokenCredential`).
-3. Explicit credentials — no global config for keys or secrets.
+3. Explicit credentials - no global config for keys or secrets.
 4. Token acquisition is fallible: `{:ok, token} | {:error, Error.t()}`.
 
 ## Behaviours (v0.2.0)
@@ -93,6 +93,6 @@ Supervised GenServer (`AzureSDK.Application`):
 
 ## Related Documents
 
-- `README.md` (Roadmap) — v0.2.0 Identity + Core Contracts
+- `README.md` (Roadmap) - v0.2.0 Identity + Core Contracts
 - `pipeline-design.md`
 - `guides/azure_identity.md`

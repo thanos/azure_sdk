@@ -4,9 +4,9 @@ defmodule AzureSDK.Identity.AccessToken do
 
   ## Fields
 
-  * `:token` — opaque access token string (required)
-  * `:expires_at` — absolute UTC expiry (`DateTime`) (required)
-  * `:token_type` — token type for the Authorization header; default `"Bearer"`
+  * `:token` - opaque access token string (required; hidden from `inspect/2`)
+  * `:expires_at` - absolute UTC expiry (`DateTime`) (required)
+  * `:token_type` - token type for the Authorization header; default `"Bearer"`
 
   ## Examples
 
@@ -23,6 +23,7 @@ defmodule AzureSDK.Identity.AccessToken do
           token_type: String.t()
         }
 
+  @derive {Inspect, except: [:token]}
   @enforce_keys [:token, :expires_at]
   defstruct token: nil, expires_at: nil, token_type: "Bearer"
 
@@ -31,10 +32,10 @@ defmodule AzureSDK.Identity.AccessToken do
 
   ## Parameters
 
-  * `token` — access token string
-  * `expires_at` — absolute expiry as `DateTime`
-  * `opts` — optional keyword list:
-    * `:token_type` — defaults to `"Bearer"`
+  * `token` - access token string
+  * `expires_at` - absolute expiry as `DateTime`
+  * `opts` - optional keyword list:
+    * `:token_type` - defaults to `"Bearer"`
 
   ## Returns
 
@@ -60,9 +61,9 @@ defmodule AzureSDK.Identity.AccessToken do
 
   ## Parameters
 
-  * `body` — decoded JSON map. Must include `"access_token"` and either:
-    * `"expires_on"` — unix seconds as integer or string, or
-    * `"expires_in"` — lifetime in seconds from now (integer or string)
+  * `body` - decoded JSON map. Must include `"access_token"` and either:
+    * `"expires_on"` - unix seconds as integer or string, or
+    * `"expires_in"` - lifetime in seconds from now (integer or string)
 
   Optional `"token_type"` defaults to `"Bearer"`.
 
@@ -115,8 +116,8 @@ defmodule AzureSDK.Identity.AccessToken do
 
   ## Parameters
 
-  * `token` — access token
-  * `buffer_seconds` — refresh lead time; default `300`
+  * `token` - access token
+  * `buffer_seconds` - refresh lead time; default `300`
 
   ## Examples
 

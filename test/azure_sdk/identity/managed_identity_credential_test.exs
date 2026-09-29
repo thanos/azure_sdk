@@ -33,4 +33,19 @@ defmodule AzureSDK.Identity.ManagedIdentityCredentialTest do
     assert {:ok, %AccessToken{token: "mi-token"}} =
              TokenCredential.get_token(credential, ["https://storage.azure.com/.default"])
   end
+
+  test "returns CredentialUnavailable when IMDS is unreachable", %{
+    bypass: bypass,
+    credential: credential
+  } do
+    Bypass.down(bypass)
+
+    assert {:error, %AzureSDK.Error{code: "CredentialUnavailable"}} =
+             TokenCredential.get_token(credential, ["https://storage.azure.com/.default"])
+  end
+
+  test "rejects more than one scope", %{credential: credential} do
+    assert {:error, %AzureSDK.Error{code: "InvalidScope"}} =
+             TokenCredential.get_token(credential, ["https://a/.default", "https://b/.default"])
+  end
 end

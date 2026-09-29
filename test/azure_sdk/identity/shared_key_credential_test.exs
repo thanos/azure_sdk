@@ -20,4 +20,12 @@ defmodule AzureSDK.Identity.SharedKeyCredentialTest do
     assert signed.headers["Authorization"] =~ "SharedKey account:"
     assert signed.headers["x-ms-date"]
   end
+
+  test "returns an error instead of raising for a key that is not Base64" do
+    credential = SharedKeyCredential.new("account", "not base64!!")
+    request = Request.new(method: :get, path: "/container", service: :blob)
+
+    assert {:error, %AzureSDK.Error{code: "InvalidCredential", service: :blob}} =
+             Credential.authorize_request(credential, request)
+  end
 end

@@ -7,10 +7,10 @@ defmodule AzureSDK.Identity.WorkloadIdentityCredential do
 
   ## Fields
 
-  * `:tenant_id` — Entra tenant ID
-  * `:client_id` — application client ID
-  * `:federated_token_file` — path to the projected JWT file
-  * `:authority_host` — login host; default `https://login.microsoftonline.com`
+  * `:tenant_id` - Entra tenant ID
+  * `:client_id` - application client ID
+  * `:federated_token_file` - path to the projected JWT file
+  * `:authority_host` - login host; default `https://login.microsoftonline.com`
 
   ## Examples
 
@@ -47,8 +47,8 @@ defmodule AzureSDK.Identity.WorkloadIdentityCredential do
 
   * `:tenant_id` (required)
   * `:client_id` (required)
-  * `:federated_token_file` (required) — path to the federated token
-  * `:authority_host` — defaults to the public cloud login host
+  * `:federated_token_file` (required) - path to the federated token
+  * `:authority_host` - defaults to the public cloud login host
 
   ## Errors
 
@@ -85,14 +85,14 @@ defmodule AzureSDK.Identity.WorkloadIdentityCredential do
 
   ## Options
 
-  * `:req_options` — extra Req options
+  * `:req_options` - extra Req options
 
   ## Returns
 
   * `{:ok, %AzureSDK.Identity.AccessToken{}}`
-  * `{:error, %AzureSDK.Error{code: "FederatedTokenEmpty"}}` — empty file
-  * `{:error, %AzureSDK.Error{code: "FederatedTokenUnavailable"}}` — unreadable file
-  * `{:error, %AzureSDK.Error{}}` — token endpoint failure
+  * `{:error, %AzureSDK.Error{code: "FederatedTokenEmpty"}}` - empty file
+  * `{:error, %AzureSDK.Error{code: "FederatedTokenUnavailable"}}` - unreadable file
+  * `{:error, %AzureSDK.Error{}}` - token endpoint failure
 
   ## Examples
 
@@ -101,18 +101,16 @@ defmodule AzureSDK.Identity.WorkloadIdentityCredential do
       ...>   client_id: "c",
       ...>   federated_token_file: "/tmp/does-not-exist-azure-sdk-wi"
       ...> )
-      iex> {:error, %{code: "FederatedTokenUnavailable"}} =
+      iex> match?(
+      ...>   {:error, %{code: "FederatedTokenUnavailable"}},
       ...>   AzureSDK.Identity.WorkloadIdentityCredential.get_token(cred, ["https://storage.azure.com/.default"])
-      iex> true
+      ...> )
       true
   """
   @impl AzureSDK.Identity.TokenCredential
   def get_token(%__MODULE__{} = credential, scopes, opts \\ []) when is_list(scopes) do
     with {:ok, assertion} <- read_token_file(credential.federated_token_file) do
-      url =
-        credential.authority_host
-        |> String.trim_trailing("/")
-        |> Kernel.<>("/#{credential.tenant_id}/oauth2/v2.0/token")
+      url = Http.token_url(credential.authority_host, credential.tenant_id)
 
       form = %{
         "client_id" => credential.client_id,

@@ -8,27 +8,14 @@ defmodule AzureSDK.Application do
 
   ## Children
 
-  * `AzureSDK.Identity.TokenCache` — named GenServer token cache
+  * `AzureSDK.Identity.TokenCache` - named GenServer token cache
   """
 
   use Application
 
   @doc """
-  Starts the AzureSDK supervision tree.
-
-  ## Parameters
-
-  * `_type` — OTP start type (unused)
-  * `_args` — application start args (unused)
-
-  ## Returns
-
-  * `{:ok, pid}` — supervisor pid
-  * `{:error, reason}` — supervisor failed to start
-
-  ## Examples
-
-  The application is started by the BEAM. In IEx after `mix` loads the app:
+  Starts the AzureSDK supervision tree. OTP calls this when `:azure_sdk`
+  starts; application code does not call it directly.
 
       {:ok, _} = Application.ensure_all_started(:azure_sdk)
       true = is_pid(Process.whereis(AzureSDK.Identity.TokenCache))

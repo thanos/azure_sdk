@@ -10,7 +10,7 @@ Azure platform SDK for Elixir and Erlang.
 
 AzureSDK is not a Blob Storage library. It is a long-term, multi-service Azure SDK built on BEAM-native patterns: explicit client structs, OTP-ready design, first-class telemetry, and a reusable Req pipeline.
 
-**v0.2.0** adds Entra ID / OAuth credentials, a supervised token cache, and production-oriented retry contracts on top of the Blob Storage foundation. Queue, Table, Management, and BEAM integrations follow in later releases (see Roadmap below).
+**v0.2.0** adds Entra ID / OAuth credentials, a supervised token cache, and idempotency-aware retries on top of the Blob Storage foundation. Queue, Table, Management, and BEAM integrations follow in later releases (see Roadmap below).
 
 ## Installation
 
@@ -90,7 +90,7 @@ v0.1.0 established the platform foundation. Releases after v0.2.0 deepen Blob be
 | **v0.6.0** | Management Plane | ARM client, LRO, StorageAccount |
 | **v0.7.0** | BEAM Integrations | Broadway, Flow (use-case driven) |
 
-### v0.2.0 — Identity + Core Contracts (Current)
+### v0.2.0 - Identity + Core Contracts (Current)
 
 Intentionally breaking pre-1.0 release:
 
@@ -102,7 +102,7 @@ Intentionally breaking pre-1.0 release:
 - Retry: jitter, `Retry-After` / `x-ms-retry-after-ms`, idempotent transport retries, 401 refresh-once
 - `Storage.ServiceVersion`
 
-### v0.3.0 — Production Blob Storage
+### v0.3.0 - Production Blob Storage
 
 - Bounded-memory `upload_stream` via Put Block / Put Block List
 - Range-based `download_stream`

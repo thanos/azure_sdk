@@ -38,9 +38,9 @@ defmodule AzureSDK.Storage.Container do
   @typedoc """
   Container result map.
 
-  * `:name` — container name
-  * `:properties` — etag and last modified when known
-  * `:metadata` — user metadata
+  * `:name` - container name
+  * `:properties` - etag and last modified when known
+  * `:metadata` - user metadata
   """
   @type container :: %{
           name: String.t(),
@@ -53,16 +53,16 @@ defmodule AzureSDK.Storage.Container do
 
   ## Parameters
 
-  * `client` — `AzureSDK.Storage.Client`
-  * `name` — container name
-  * `opts` — optional keyword list:
-    * `:public_access` — public access level (for example `:blob` or `:container`)
-    * `:metadata` — string-keyed user metadata
+  * `client` - `AzureSDK.Storage.Client`
+  * `name` - container name
+  * `opts` - optional keyword list:
+    * `:public_access` - public access level (for example `:blob` or `:container`)
+    * `:metadata` - string-keyed user metadata
 
   ## Returns
 
   * `{:ok, container()}`
-  * `{:error, %AzureSDK.Error{}}` — including conflict when the container exists
+  * `{:error, %AzureSDK.Error{}}` - including conflict when the container exists
 
   ## Examples
 
@@ -156,7 +156,7 @@ defmodule AzureSDK.Storage.Container do
 
   ## Returns
 
-  * `{:ok, [map()]}` — parsed blob entries from the list XML
+  * `{:ok, [map()]}` - parsed blob entries from the list XML
   * `{:error, %AzureSDK.Error{}}`
 
   ## Examples
@@ -177,9 +177,9 @@ defmodule AzureSDK.Storage.Container do
 
   ## Returns
 
-  * `true` — container exists
-  * `false` — Azure reported missing (HTTP 404 / `ContainerNotFound`)
-  * `{:error, %AzureSDK.Error{}}` — auth, network, or other failures
+  * `true` - container exists
+  * `false` - Azure reported missing (HTTP 404 / `ContainerNotFound`)
+  * `{:error, %AzureSDK.Error{}}` - auth, network, or other failures
 
   ## Examples
 

@@ -31,4 +31,19 @@ defmodule AzureSDK.Identity.AccessTokenTest do
   test "rejects missing access_token" do
     assert {:error, %{code: "InvalidTokenResponse"}} = AccessToken.from_response(%{})
   end
+
+  test "from_response accepts expires_in as a string" do
+    assert {:ok, %AccessToken{} = token} =
+             AccessToken.from_response(%{"access_token" => "a", "expires_in" => "3600"})
+
+    refute AccessToken.stale?(token, 0)
+  end
+
+  test "from_response rejects a missing or non-numeric expiry" do
+    assert {:error, %AzureSDK.Error{code: "InvalidTokenResponse"}} =
+             AccessToken.from_response(%{"access_token" => "a"})
+
+    assert {:error, %AzureSDK.Error{code: "InvalidTokenResponse"}} =
+             AccessToken.from_response(%{"access_token" => "a", "expires_on" => "soon"})
+  end
 end

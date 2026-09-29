@@ -8,25 +8,26 @@ defmodule AzureSDK.Core.Pipeline do
 
   Authorization:
 
-  * `TokenCredential` — `TokenCache.fetch/3` then `AzureSDK.Pipeline.Bearer`
-  * `Credential` with `authorize_request/2` — Shared Key or SAS
-  * no credential — request sent unchanged
+  * `TokenCredential` - `TokenCache.fetch/3` then `AzureSDK.Pipeline.Bearer`
+  * `Credential` with `authorize_request/2` - Shared Key or SAS
+  * no credential - request sent unchanged
 
-  Retry covers HTTP 408/429/5xx and idempotent transport errors. A single
-  force-refresh is attempted on HTTP 401 for token credentials.
+  Retry covers HTTP 429/503 always, HTTP 408/500/502/504 and transport errors
+  for idempotent requests (see `AzureSDK.Core.Retry`). A single token refresh
+  is attempted on HTTP 401 for token credentials.
 
   ## Options
 
   Passed through `run/3`:
 
-  * `:scopes` — OAuth scopes for token credentials
-  * `:server` / `:buffer_seconds` / `:force_refresh` — TokenCache options
-  * other keys — merged into Req options
+  * `:scopes` - OAuth scopes for token credentials
+  * `:server` / `:buffer_seconds` / `:force_refresh` - TokenCache options
+  * other keys - merged into Req options
 
   ## Returns
 
-  * `{:ok, %AzureSDK.Core.Response{}}` — HTTP 2xx
-  * `{:error, %AzureSDK.Error{}}` — auth failure, non-2xx after retries, or transport error
+  * `{:ok, %AzureSDK.Core.Response{}}` - HTTP 2xx
+  * `{:error, %AzureSDK.Error{}}` - auth failure, non-2xx after retries, or transport error
 
   Does not raise for expected Azure or transport failures (exceptions are wrapped).
 
@@ -60,9 +61,9 @@ defmodule AzureSDK.Core.Pipeline do
 
   ## Parameters
 
-  * `client` — `AzureSDK.Core.Client`
-  * `request` — `AzureSDK.Core.Request`
-  * `opts` — scopes, TokenCache options, and/or Req options (see module docs)
+  * `client` - `AzureSDK.Core.Client`
+  * `request` - `AzureSDK.Core.Request`
+  * `opts` - scopes, TokenCache options, and/or Req options (see module docs)
 
   ## Returns
 
@@ -114,7 +115,7 @@ defmodule AzureSDK.Core.Pipeline do
   end
 
   defp maybe_retry_response(client, request, opts, metadata, attempt, refreshed?, response) do
-    if Retry.retryable?(response) and attempt < client.retry.max_attempts do
+    if Retry.retry_response?(request, response) and attempt < client.retry.max_attempts do
       Retry.backoff(client.retry, attempt, metadata, response)
       execute_with_retry(client, request, opts, metadata, attempt + 1, refreshed?)
     else

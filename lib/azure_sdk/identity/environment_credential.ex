@@ -4,14 +4,14 @@ defmodule AzureSDK.Identity.EnvironmentCredential do
 
   Supported combinations (first match wins):
 
-  1. Client secret — `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
-  2. Workload identity — `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_FEDERATED_TOKEN_FILE`
+  1. Client secret - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
+  2. Workload identity - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_FEDERATED_TOKEN_FILE`
 
   Optional: `AZURE_AUTHORITY_HOST` overrides the login host.
 
   ## Fields
 
-  * `:inner` — resolved `TokenCredential`, or `nil` when env is incomplete
+  * `:inner` - resolved `TokenCredential`, or `nil` when env is incomplete
 
   ## Examples
 
@@ -40,7 +40,7 @@ defmodule AzureSDK.Identity.EnvironmentCredential do
 
   ## Options
 
-  * `:env` — map or `String.t() -> String.t() | nil` function (defaults to `System.get_env/1`)
+  * `:env` - map or `String.t() -> String.t() | nil` function (defaults to `System.get_env/1`)
 
   ## Examples
 
@@ -90,9 +90,10 @@ defmodule AzureSDK.Identity.EnvironmentCredential do
   ## Examples
 
       iex> cred = AzureSDK.Identity.EnvironmentCredential.new(env: %{})
-      iex> {:error, %{code: "CredentialUnavailable"}} =
+      iex> match?(
+      ...>   {:error, %{code: "CredentialUnavailable"}},
       ...>   AzureSDK.Identity.EnvironmentCredential.get_token(cred, ["https://storage.azure.com/.default"], [])
-      iex> true
+      ...> )
       true
   """
   @impl AzureSDK.Identity.TokenCredential

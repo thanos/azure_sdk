@@ -5,41 +5,24 @@ defmodule AzureSDK.Identity.Http do
   alias AzureSDK.Identity.AccessToken
 
   @doc """
+  Builds the Entra v2 token endpoint URL for a tenant.
+  """
+  @spec token_url(String.t(), String.t()) :: String.t()
+  def token_url(authority_host, tenant_id) do
+    String.trim_trailing(authority_host, "/") <> "/#{tenant_id}/oauth2/v2.0/token"
+  end
+
+  @doc """
   POSTs form-encoded body to a token endpoint and parses an AccessToken.
   """
   @spec post_form(String.t(), map(), keyword()) ::
           {:ok, AccessToken.t()} | {:error, Error.t()}
   def post_form(url, form, opts \\ []) do
-    headers =
-      [{"content-type", "application/x-www-form-urlencoded"}]
-      |> Kernel.++(Keyword.get(opts, :headers, []))
+    headers = [
+      {"content-type", "application/x-www-form-urlencoded"} | Keyword.get(opts, :headers, [])
+    ]
 
-    req_opts =
-      [
-        method: :post,
-        url: url,
-        headers: headers,
-        form: form,
-        decode_body: true,
-        retry: false
-      ]
-      |> Keyword.merge(Keyword.get(opts, :req_options, []))
-
-    case Req.request(req_opts) do
-      {:ok, %Req.Response{status: status, body: body}} when status in 200..299 ->
-        body
-        |> normalize_body()
-        |> AccessToken.from_response()
-
-      {:ok, %Req.Response{status: status, body: body}} ->
-        {:error, token_error(status, body)}
-
-      {:error, exception} ->
-        {:error, Error.from_exception(:identity, exception)}
-    end
-  rescue
-    exception ->
-      {:error, Error.from_exception(:identity, exception)}
+    request([method: :post, url: url, headers: headers, form: form], opts)
   end
 
   @doc """
@@ -47,16 +30,13 @@ defmodule AzureSDK.Identity.Http do
   """
   @spec get_json(String.t(), keyword()) :: {:ok, AccessToken.t()} | {:error, Error.t()}
   def get_json(url, opts \\ []) do
-    headers = Keyword.get(opts, :headers, [])
+    request([method: :get, url: url, headers: Keyword.get(opts, :headers, [])], opts)
+  end
 
+  defp request(base, opts) do
     req_opts =
-      [
-        method: :get,
-        url: url,
-        headers: headers,
-        decode_body: true,
-        retry: false
-      ]
+      base
+      |> Keyword.merge(decode_body: true, retry: false)
       |> Keyword.merge(Keyword.get(opts, :req_options, []))
 
     case Req.request(req_opts) do
@@ -99,7 +79,7 @@ defmodule AzureSDK.Identity.Http do
 
     Error.new(
       status: status,
-      code: parsed["error"] || parsed["error_codes"] || "TokenAcquisitionFailed",
+      code: error_code(parsed["error"]),
       message:
         parsed["error_description"] || parsed["error_message"] || parsed["message"] ||
           "Token acquisition failed with HTTP #{status}",
@@ -107,4 +87,7 @@ defmodule AzureSDK.Identity.Http do
       details: parsed
     )
   end
+
+  defp error_code(code) when is_binary(code) and code != "", do: code
+  defp error_code(_), do: "TokenAcquisitionFailed"
 end

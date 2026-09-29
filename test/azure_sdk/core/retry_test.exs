@@ -10,6 +10,28 @@ defmodule AzureSDK.Core.RetryTest do
     refute Retry.retryable?(%Response{status: 404})
   end
 
+  test "response retries respect idempotency except for 429 and 503" do
+    post = Request.new(method: :post, path: "/", metadata: %{idempotent: false})
+    get = Request.new(method: :get, path: "/")
+
+    assert Retry.retry_response?(post, %Response{status: 429})
+    assert Retry.retry_response?(post, %Response{status: 503})
+    refute Retry.retry_response?(post, %Response{status: 500})
+    refute Retry.retry_response?(post, %Response{status: 408})
+    assert Retry.retry_response?(get, %Response{status: 500})
+    refute Retry.retry_response?(get, %Response{status: 404})
+  end
+
+  test "Retry-After longer than max_delay_ms is honored up to max_retry_after_ms" do
+    policy = %{Retry.default_policy() | jitter: false}
+
+    assert Retry.delay_ms(policy, 1, %Response{status: 429, headers: %{"retry-after" => "30"}}) ==
+             30_000
+
+    assert Retry.delay_ms(policy, 1, %Response{status: 429, headers: %{"retry-after" => "600"}}) ==
+             60_000
+  end
+
   test "exponential backoff delay without jitter" do
     policy = %{Retry.default_policy() | jitter: false}
     assert Retry.delay_ms(policy, 1) == 200

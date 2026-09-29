@@ -7,10 +7,10 @@ defmodule AzureSDK.Identity.ClientSecretCredential do
 
   ## Fields
 
-  * `:tenant_id` — Microsoft Entra tenant (directory) ID
-  * `:client_id` — application (client) ID
-  * `:client_secret` — client secret value
-  * `:authority_host` — login host; default `https://login.microsoftonline.com`
+  * `:tenant_id` - Microsoft Entra tenant (directory) ID
+  * `:client_id` - application (client) ID
+  * `:client_secret` - client secret value (hidden from `inspect/2`)
+  * `:authority_host` - login host; default `https://login.microsoftonline.com`
 
   ## Examples
 
@@ -37,6 +37,7 @@ defmodule AzureSDK.Identity.ClientSecretCredential do
           authority_host: String.t()
         }
 
+  @derive {Inspect, except: [:client_secret]}
   defstruct [:tenant_id, :client_id, :client_secret, :authority_host]
 
   @doc """
@@ -44,10 +45,10 @@ defmodule AzureSDK.Identity.ClientSecretCredential do
 
   ## Options
 
-  * `:tenant_id` (required) — Entra tenant ID
-  * `:client_id` (required) — application client ID
-  * `:client_secret` (required) — client secret
-  * `:authority_host` — defaults to `https://login.microsoftonline.com`
+  * `:tenant_id` (required) - Entra tenant ID
+  * `:client_id` (required) - application client ID
+  * `:client_secret` (required) - client secret
+  * `:authority_host` - defaults to `https://login.microsoftonline.com`
 
   ## Returns
 
@@ -98,15 +99,15 @@ defmodule AzureSDK.Identity.ClientSecretCredential do
 
   ## Parameters
 
-  * `credential` — client secret credential
-  * `scopes` — OAuth scopes (joined with spaces in the token request)
-  * `opts` — optional keyword list:
-    * `:req_options` — extra Req options (for example `[plug: mock]` in tests)
+  * `credential` - client secret credential
+  * `scopes` - OAuth scopes (joined with spaces in the token request)
+  * `opts` - optional keyword list:
+    * `:req_options` - extra Req options (for example `[plug: mock]` in tests)
 
   ## Returns
 
   * `{:ok, %AzureSDK.Identity.AccessToken{}}`
-  * `{:error, %AzureSDK.Error{}}` — HTTP or parse failure (`service: :identity`)
+  * `{:error, %AzureSDK.Error{}}` - HTTP or parse failure (`service: :identity`)
 
   Does not raise for Entra HTTP errors.
 
@@ -128,10 +129,7 @@ defmodule AzureSDK.Identity.ClientSecretCredential do
   """
   @impl AzureSDK.Identity.TokenCredential
   def get_token(%__MODULE__{} = credential, scopes, opts \\ []) when is_list(scopes) do
-    url =
-      credential.authority_host
-      |> String.trim_trailing("/")
-      |> Kernel.<>("/#{credential.tenant_id}/oauth2/v2.0/token")
+    url = Http.token_url(credential.authority_host, credential.tenant_id)
 
     form = %{
       "client_id" => credential.client_id,

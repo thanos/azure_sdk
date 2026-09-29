@@ -6,11 +6,11 @@ defmodule AzureSDK.Core.Client do
 
   ## Fields
 
-  * `:credential` — request or token credential, or `nil`
-  * `:api_version` — optional API version string
-  * `:retry` — `AzureSDK.Core.Retry` policy map
-  * `:req_options` — extra options merged into Req
-  * `:endpoint` — absolute service endpoint URL
+  * `:credential` - request or token credential, or `nil`
+  * `:api_version` - optional API version string
+  * `:retry` - `AzureSDK.Core.Retry` policy map
+  * `:req_options` - extra options merged into Req
+  * `:endpoint` - absolute service endpoint URL
 
   ## Examples
 
@@ -40,11 +40,11 @@ defmodule AzureSDK.Core.Client do
 
   ## Options
 
-  * `:credential` — credential struct
-  * `:api_version` — API version string
-  * `:retry` — retry policy; defaults to `AzureSDK.Core.Retry.default_policy/0`
-  * `:req_options` — keyword list for Req
-  * `:endpoint` — absolute base URL
+  * `:credential` - credential struct
+  * `:api_version` - API version string
+  * `:retry` - retry policy; defaults to `AzureSDK.Core.Retry.default_policy/0`
+  * `:req_options` - keyword list for Req
+  * `:endpoint` - absolute base URL
 
   ## Examples
 

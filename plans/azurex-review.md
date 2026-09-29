@@ -1,4 +1,4 @@
-# Azurex Review — Comparison with AzureSDK
+# Azurex Review - Comparison with AzureSDK
 
 [Azurex](https://github.com/treasure-data/azurex) is the established Elixir library for Azure Storage. AzureSDK is designed as a **platform SDK** that supersedes Azurex's scope over multiple releases. This document compares architectures and guides migration planning.
 
@@ -12,7 +12,7 @@
 | Telemetry | None built-in | `:telemetry` on every operation and request |
 | Error type | Various tuples / exceptions | `%AzureSDK.Error{}` consistently |
 | Testing | Cloud or manual | Azurite-first integration suite |
-| Management plane | Not supported | Namespace reserved (v0.5.0) |
+| Management plane | Not supported | Namespace reserved (v0.6.0) |
 | Streaming | Limited | `upload_stream`, `download_stream` |
 | API version | Older defaults | `2024-11-04` default |
 
@@ -31,7 +31,7 @@ AzureSDK.Core.Pipeline  → retry, telemetry, transport
 AzureSDK.Storage.Blob   → blob operations only
 ```
 
-Adding Queue Storage in v0.3.0 means a new `AzureSDK.Storage.Queue` module reusing the same pipeline — not copying auth code.
+Adding Queue Storage in v0.3.0 means a new `AzureSDK.Storage.Queue` module reusing the same pipeline - not copying auth code.
 
 ### Authentication
 
@@ -78,10 +78,10 @@ Both libraries support local development with Azurite. AzureSDK handles the path
 ## Migration Considerations
 
 1. **Replace config-based keys** with explicit `SharedKeyCredential` structs.
-2. **Wrap client creation** — one `Storage.Client` per account, pass to all operations.
-3. **Update error handling** — pattern match on `%AzureSDK.Error{}` instead of raw HTTP errors.
-4. **Add telemetry handlers** — optional but recommended for production.
-5. **Update HTTP-related deps** — remove HTTPoison if it was only used for Azurex.
+2. **Wrap client creation** - one `Storage.Client` per account, pass to all operations.
+3. **Update error handling** - pattern match on `%AzureSDK.Error{}` instead of raw HTTP errors.
+4. **Add telemetry handlers** - optional but recommended for production.
+5. **Update HTTP-related deps** - remove HTTPoison if it was only used for Azurex.
 
 See `guides/migrating_from_azurex.md` for a step-by-step migration guide.
 

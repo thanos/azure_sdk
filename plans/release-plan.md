@@ -1,4 +1,4 @@
-# Release Plan — v0.1.0
+# Release Plan - v0.1.0
 
 Deliverables and release process for the AzureSDK v0.1.0 Foundation Release.
 
@@ -74,5 +74,5 @@ v0.2.0 Identity (highest priority) → v0.3.0 Queue → v0.4.0 Table → v0.5.0 
 
 ## Related Documents
 
-- `README.md` (Roadmap) — feature detail per version
-- `livebook-strategy.md` — notebook validation
+- `README.md` (Roadmap) - feature detail per version
+- `livebook-strategy.md` - notebook validation

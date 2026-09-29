@@ -52,11 +52,11 @@ defmodule AzureSDK.Storage.Blob do
   @typedoc """
   Blob result map.
 
-  * `:container` — container name
-  * `:name` — blob name (may include `/` path segments)
-  * `:properties` — content type, length, etag, last modified
-  * `:metadata` — user metadata (without the `x-ms-meta-` prefix)
-  * `:content` — body bytes when included, otherwise `nil`
+  * `:container` - container name
+  * `:name` - blob name (may include `/` path segments)
+  * `:properties` - content type, length, etag, last modified
+  * `:metadata` - user metadata (without the `x-ms-meta-` prefix)
+  * `:content` - body bytes when included, otherwise `nil`
   """
   @type blob :: %{
           container: String.t(),
@@ -71,15 +71,15 @@ defmodule AzureSDK.Storage.Blob do
 
   ## Parameters
 
-  * `client` — `AzureSDK.Storage.Client`
-  * `container` — container name
-  * `name` — blob name (path segments allowed)
-  * `content` — binary or iodata
-  * `opts` — optional keyword list:
-    * `:content_type` — defaults to `"application/octet-stream"`
-    * `:blob_type` — defaults to `"BlockBlob"`
-    * `:metadata` — string-keyed user metadata map
-    * `:include_content` — when `false`, returned `:content` is `nil` (default `true`)
+  * `client` - `AzureSDK.Storage.Client`
+  * `container` - container name
+  * `name` - blob name (path segments allowed)
+  * `content` - binary or iodata
+  * `opts` - optional keyword list:
+    * `:content_type` - defaults to `"application/octet-stream"`
+    * `:blob_type` - defaults to `"BlockBlob"`
+    * `:metadata` - string-keyed user metadata map
+    * `:include_content` - when `false`, returned `:content` is `nil` (default `true`)
 
   ## Returns
 
@@ -150,16 +150,16 @@ defmodule AzureSDK.Storage.Blob do
 
   ## Parameters
 
-  * `client` — storage client
-  * `container` — container name
-  * `name` — blob name
-  * `opts` — optional:
-    * `:include_content` — when `false`, `:content` is `nil` (default `true`)
+  * `client` - storage client
+  * `container` - container name
+  * `name` - blob name
+  * `opts` - optional:
+    * `:include_content` - when `false`, `:content` is `nil` (default `true`)
 
   ## Returns
 
   * `{:ok, blob()}`
-  * `{:error, %AzureSDK.Error{}}` — including 404 when the blob is missing
+  * `{:error, %AzureSDK.Error{}}` - including 404 when the blob is missing
 
   ## Examples
 
@@ -289,11 +289,11 @@ defmodule AzureSDK.Storage.Blob do
 
   ## Parameters
 
-  * `metadata` — string-keyed map of user metadata values
+  * `metadata` - string-keyed map of user metadata values
 
   ## Returns
 
-  * `{:ok, map()}` — the metadata that was written
+  * `{:ok, map()}` - the metadata that was written
   * `{:error, %AzureSDK.Error{}}`
 
   ## Examples

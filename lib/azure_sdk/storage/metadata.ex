@@ -15,7 +15,7 @@ defmodule AzureSDK.Storage.Metadata do
 
   ## Parameters
 
-  * `metadata` — map of metadata key to value
+  * `metadata` - map of metadata key to value
 
   ## Examples
 
@@ -37,7 +37,7 @@ defmodule AzureSDK.Storage.Metadata do
 
   ## Parameters
 
-  * `headers` — response header map
+  * `headers` - response header map
 
   ## Examples
 

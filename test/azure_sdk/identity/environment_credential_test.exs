@@ -44,4 +44,24 @@ defmodule AzureSDK.Identity.EnvironmentCredentialTest do
     assert {:error, %{code: "CredentialUnavailable"}} =
              TokenCredential.get_token(cred, ["https://storage.azure.com/.default"])
   end
+
+  test "cache key differs from a bare ClientSecretCredential with the same ids" do
+    env =
+      EnvironmentCredential.new(
+        env: %{
+          "AZURE_TENANT_ID" => "tenant",
+          "AZURE_CLIENT_ID" => "client",
+          "AZURE_CLIENT_SECRET" => "secret"
+        }
+      )
+
+    bare =
+      ClientSecretCredential.new(
+        tenant_id: "tenant",
+        client_id: "client",
+        client_secret: "secret"
+      )
+
+    refute TokenCredential.cache_key(env) == TokenCredential.cache_key(bare)
+  end
 end

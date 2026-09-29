@@ -4,17 +4,18 @@ defmodule AzureSDK.Identity.DefaultAzureCredential do
 
   Default order:
 
-  1. `EnvironmentCredential`
-  2. `WorkloadIdentityCredential` when federated-token env vars are present
-  3. `ManagedIdentityCredential`
+  1. `EnvironmentCredential` (client secret, or workload identity when
+     `AZURE_FEDERATED_TOKEN_FILE` is set)
+  2. `ManagedIdentityCredential`
 
-  Short-circuits on the first successful token. Continues after
-  `CredentialUnavailable` and other acquisition errors, returning the last
-  error when the chain is exhausted.
+  Returns the first successful token. Moves to the next credential only on
+  `CredentialUnavailable`; any other error (for example `invalid_client` from
+  Entra) stops the chain and is returned as is, so a misconfigured credential
+  is not hidden by a later one.
 
   ## Fields
 
-  * `:credentials` — ordered list of `TokenCredential` structs
+  * `:credentials` - ordered list of `TokenCredential` structs
 
   ## Examples
 
@@ -30,8 +31,7 @@ defmodule AzureSDK.Identity.DefaultAzureCredential do
   alias AzureSDK.Identity.{
     EnvironmentCredential,
     ManagedIdentityCredential,
-    TokenCredential,
-    WorkloadIdentityCredential
+    TokenCredential
   }
 
   @typedoc "Default Azure credential. See the module documentation for field meanings."
@@ -44,9 +44,9 @@ defmodule AzureSDK.Identity.DefaultAzureCredential do
 
   ## Options
 
-  * `:credentials` — explicit list of credentials (skips default discovery)
-  * `:env` — passed to environment / workload discovery
-  * `:managed_identity` — options for `ManagedIdentityCredential.new/1`
+  * `:credentials` - explicit list of credentials (skips default discovery)
+  * `:env` - passed to `EnvironmentCredential.new/1`
+  * `:managed_identity` - options for `ManagedIdentityCredential.new/1`
 
   ## Examples
 
@@ -67,17 +67,23 @@ defmodule AzureSDK.Identity.DefaultAzureCredential do
   end
 
   @doc """
-  Cache key `:default_azure_credential`.
+  Cache key built from the cache keys of every credential in the chain.
+
+  Two chains share cached tokens only when they contain the same identities.
 
   ## Examples
 
       iex> AzureSDK.Identity.DefaultAzureCredential.cache_key(
-      ...>   AzureSDK.Identity.DefaultAzureCredential.new(env: %{})
+      ...>   AzureSDK.Identity.DefaultAzureCredential.new(
+      ...>     credentials: [AzureSDK.Identity.ManagedIdentityCredential.new(client_id: "mi")]
+      ...>   )
       ...> )
-      :default_azure_credential
+      {:default_azure_credential, [{:managed_identity, "mi"}]}
   """
   @impl AzureSDK.Identity.TokenCredential
-  def cache_key(%__MODULE__{}), do: :default_azure_credential
+  def cache_key(%__MODULE__{credentials: credentials}) do
+    {:default_azure_credential, Enum.map(credentials, &TokenCredential.cache_key/1)}
+  end
 
   @doc """
   Tries each credential in order until one returns `{:ok, token}`.
@@ -85,17 +91,19 @@ defmodule AzureSDK.Identity.DefaultAzureCredential do
   ## Returns
 
   * `{:ok, %AzureSDK.Identity.AccessToken{}}`
-  * `{:error, %AzureSDK.Error{}}` — last error from the chain (often
-    `CredentialUnavailable` when nothing is configured)
+  * `{:error, %AzureSDK.Error{}}` - the first error that is not
+    `CredentialUnavailable`, or the last `CredentialUnavailable` when no
+    credential in the chain is usable
 
   ## Examples
 
       iex> cred = AzureSDK.Identity.DefaultAzureCredential.new(
       ...>   credentials: [AzureSDK.Identity.EnvironmentCredential.new(env: %{})]
       ...> )
-      iex> {:error, %{code: "CredentialUnavailable"}} =
+      iex> match?(
+      ...>   {:error, %{code: "CredentialUnavailable"}},
       ...>   AzureSDK.Identity.DefaultAzureCredential.get_token(cred, ["https://storage.azure.com/.default"])
-      iex> true
+      ...> )
       true
   """
   @impl AzureSDK.Identity.TokenCredential
@@ -106,58 +114,21 @@ defmodule AzureSDK.Identity.DefaultAzureCredential do
         {:ok, _} = ok ->
           {:halt, ok}
 
-        {:error, %Error{code: "CredentialUnavailable"} = error} ->
-          {:cont, {:error, error}}
+        {:error, %Error{code: "CredentialUnavailable"}} = error ->
+          {:cont, error}
 
-        {:error, error} ->
-          {:cont, {:error, error}}
+        {:error, _} = error ->
+          {:halt, error}
       end
     end)
   end
 
   defp build_chain(opts) do
-    env = Keyword.get(opts, :env)
+    env_opts = if Keyword.has_key?(opts, :env), do: [env: opts[:env]], else: []
     mi_opts = Keyword.get(opts, :managed_identity, [])
 
-    env_cred =
-      if is_nil(env) do
-        EnvironmentCredential.new()
-      else
-        EnvironmentCredential.new(env: env)
-      end
-
-    env_fun = env_reader(env)
-
-    workload =
-      case workload_from_env(env_fun) do
-        nil -> []
-        cred -> [cred]
-      end
-
-    [env_cred] ++ workload ++ [ManagedIdentityCredential.new(mi_opts)]
+    [EnvironmentCredential.new(env_opts), ManagedIdentityCredential.new(mi_opts)]
   end
-
-  defp workload_from_env(env) do
-    tenant = env.("AZURE_TENANT_ID")
-    client_id = env.("AZURE_CLIENT_ID")
-    token_file = env.("AZURE_FEDERATED_TOKEN_FILE")
-    authority = env.("AZURE_AUTHORITY_HOST")
-
-    if present?(tenant) and present?(client_id) and present?(token_file) do
-      opts = [tenant_id: tenant, client_id: client_id, federated_token_file: token_file]
-      opts = if present?(authority), do: Keyword.put(opts, :authority_host, authority), else: opts
-      WorkloadIdentityCredential.new(opts)
-    else
-      nil
-    end
-  end
-
-  defp env_reader(nil), do: &System.get_env/1
-  defp env_reader(fun) when is_function(fun, 1), do: fun
-  defp env_reader(map) when is_map(map), do: fn key -> Map.get(map, key) end
-
-  defp present?(value) when is_binary(value), do: String.trim(value) != ""
-  defp present?(_), do: false
 
   defp unavailable do
     Error.new(

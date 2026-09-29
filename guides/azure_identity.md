@@ -66,8 +66,8 @@ AzureSDK.Identity.ManagedIdentityCredential.new(client_id: "user-assigned-id")
 
 - `[:azure_sdk, :auth, :token_cache, :hit]`
 - `[:azure_sdk, :auth, :token_cache, :miss]`
-- `[:azure_sdk, :auth, :token, :acquire]` — duration of `get_token/3`
-- `[:azure_sdk, :auth, :sign]` — `scheme: :bearer` or `:shared_key`
+- `[:azure_sdk, :auth, :token, :acquire]` - duration of `get_token/3`
+- `[:azure_sdk, :auth, :sign]` - `scheme: :bearer` or `:shared_key`
 
 Never attach handlers that log token values.
 

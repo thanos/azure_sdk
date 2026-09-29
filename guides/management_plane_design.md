@@ -1,6 +1,6 @@
 # Management Plane Design
 
-How AzureSDK will implement Azure Resource Manager clients. Planned for **v0.5.0**; v0.1.0 has stubs.
+How AzureSDK will implement Azure Resource Manager clients. Planned for **v0.6.0**; current releases have stubs.
 
 ## What Is the Management Plane?
 
@@ -31,17 +31,17 @@ mgmt = Management.Client.new(
 )
 ```
 
-Converts to `Core.Client` for pipeline — same pattern as `Storage.Client`.
+Converts to `Core.Client` for pipeline - same pattern as `Storage.Client`.
 
 ## Planned Modules
 
-**StorageAccount** — create, delete, list, list_keys
+**StorageAccount** - create, delete, list, list_keys
 
-**Policy** — lifecycle rules (cool/archive tier, delete after N days)
+**Policy** - lifecycle rules (cool/archive tier, delete after N days)
 
-**Network** — firewall, VNet endpoints, private link
+**Network** - firewall, VNet endpoints, private link
 
-**Replication** — LRS, GRS, RA-GRS, ZRS
+**Replication** - LRS, GRS, RA-GRS, ZRS
 
 ## Long-Running Operations
 

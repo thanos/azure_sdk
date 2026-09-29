@@ -1,14 +1,14 @@
-# Azure SDK Study — Findings
+# Azure SDK Study - Findings
 
 Before implementing AzureSDK v0.1.0, we studied Microsoft's official Azure SDK ecosystem. This document captures architectural patterns worth adopting, gaps where the BEAM can do better, and concrete decisions reflected in the codebase.
 
 ## Sources Reviewed
 
 - [Azure SDK Design Guidelines](https://azure.github.io/azure-sdk/general_introduction.html)
-- `azure-core` — HTTP pipeline, policies, transport abstraction
-- `azure-identity` — credential types, token caching, chained credentials
-- `azure-storage-blob` — data plane client design, streaming APIs
-- `azure-mgmt-storage` — management plane, ARM REST patterns
+- `azure-core` - HTTP pipeline, policies, transport abstraction
+- `azure-identity` - credential types, token caching, chained credentials
+- `azure-storage-blob` - data plane client design, streaming APIs
+- `azure-mgmt-storage` - management plane, ARM REST patterns
 - Azure Storage REST API documentation (Shared Key auth, API versions)
 
 ## What Microsoft Does Well
@@ -29,7 +29,7 @@ Policies are modules, not callbacks, keeping the chain testable and explicit.
 
 ### Credential Abstraction
 
-`TokenCredential` is a protocol in many languages; in Python it's an ABC. AzureSDK uses an Elixir **behaviour** (`AzureSDK.Identity.Credential`) with `sign_request/2`. Shared Key, SAS, and future OAuth credentials all implement the same callback.
+`TokenCredential` is a protocol in many languages; in Python it's an ABC. AzureSDK uses two Elixir **behaviours**: `AzureSDK.Identity.Credential` with `authorize_request/2` for Shared Key and SAS, and `AzureSDK.Identity.TokenCredential` with `get_token/3` for Entra ID credentials.
 
 ### API Versioning
 
@@ -93,9 +93,9 @@ ARM APIs use Bearer tokens (OAuth2), JSON bodies, and long-running operations (L
 |-------|----------|----------------|
 | OAuth2 / AAD tokens | `ClientSecretCredential`, `ManagedIdentityCredential` | v0.2.0 |
 | DefaultAzureCredential chain | Credential resolver with ordered fallbacks | v0.2.0 |
-| LRO polling middleware | Management plane operation polling | v0.5.0 |
+| LRO polling middleware | Management plane operation polling | v0.6.0 |
 | Req vs custom Finch pool | Req with configurable `req_options` | v0.1.0 (done) |
 
 ## Conclusion
 
-Microsoft's SDK architecture is the right mental model: clients, credentials, pipelines, and service modules. AzureSDK adopts the structure and improves on observability, OTP integration, and BEAM-native data processing — capabilities no official SDK can match.
+Microsoft's SDK architecture is the right mental model: clients, credentials, pipelines, and service modules. AzureSDK adopts the structure and improves on observability, OTP integration, and BEAM-native data processing - capabilities no official SDK can match.

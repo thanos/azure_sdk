@@ -47,7 +47,7 @@ defmodule AzureSDK.Storage.ServiceVersion do
 
   ## Parameters
 
-  * `version` — Storage API version string such as `"2024-11-04"`
+  * `version` - Storage API version string such as `"2024-11-04"`
 
   ## Returns
 

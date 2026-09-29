@@ -84,8 +84,8 @@ sas =
 
 ## Client secret (Entra ID)
 
-`ClientSecretCredential` POSTs to `{authority}/{tenant}/oauth2/v2.0/token` —
-Microsoft Entra, not Azurite.
+`ClientSecretCredential` POSTs to `{authority}/{tenant}/oauth2/v2.0/token`,
+which is Microsoft Entra, not Azurite.
 
 When `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET` are set,
 this cell uses your real tenant. Otherwise it uses Req's in-memory `plug:` mock

@@ -10,10 +10,11 @@ defmodule AzureSDK.Identity.TokenCredential do
       defmodule StaticTokenCredential do
         @behaviour AzureSDK.Identity.TokenCredential
 
-        defstruct [:token]
+        defstruct [:name, :token]
 
+        # Identify the credential by a non-secret name, never by the token.
         @impl true
-        def cache_key(%__MODULE__{token: token}), do: {:static, token}
+        def cache_key(%__MODULE__{name: name}), do: {:static, name}
 
         @impl true
         def get_token(%__MODULE__{token: token}, _scopes, _opts) do
@@ -39,9 +40,9 @@ defmodule AzureSDK.Identity.TokenCredential do
 
   ## Parameters
 
-  * `credential` — behaviour implementer
-  * `scopes` — non-empty list of scope strings
-  * `opts` — implementation-specific options (often `:req_options` for Req)
+  * `credential` - behaviour implementer
+  * `scopes` - non-empty list of scope strings
+  * `opts` - implementation-specific options (often `:req_options` for Req)
 
   ## Returns
 
@@ -69,9 +70,10 @@ defmodule AzureSDK.Identity.TokenCredential do
   ## Examples
 
       iex> cred = AzureSDK.Identity.EnvironmentCredential.new(env: %{})
-      iex> {:error, %{code: "CredentialUnavailable"}} =
+      iex> match?(
+      ...>   {:error, %{code: "CredentialUnavailable"}},
       ...>   AzureSDK.Identity.TokenCredential.get_token(cred, ["https://storage.azure.com/.default"])
-      iex> true
+      ...> )
       true
   """
   @spec get_token(t(), [scope()]) :: {:ok, AccessToken.t()} | {:error, AzureSDK.Error.t()}

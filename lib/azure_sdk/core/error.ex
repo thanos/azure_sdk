@@ -8,13 +8,13 @@ defmodule AzureSDK.Error do
 
   ## Fields
 
-  * `:status` — HTTP status when the failure came from a response, otherwise `nil`
-  * `:code` — Azure error code (for example `"ContainerNotFound"`), when present
-  * `:message` — human-readable description
-  * `:request_id` — value of `x-ms-request-id` when available
-  * `:service` — logical service atom (`:blob`, `:identity`, …)
-  * `:details` — extra parsed fields from an error XML/JSON body
-  * `:cause` — original exception or reason for transport failures
+  * `:status` - HTTP status when the failure came from a response, otherwise `nil`
+  * `:code` - Azure error code (for example `"ContainerNotFound"`), when present
+  * `:message` - human-readable description
+  * `:request_id` - value of `x-ms-request-id` when available
+  * `:service` - logical service atom (`:blob`, `:identity`, …)
+  * `:details` - extra parsed fields from an error XML/JSON body
+  * `:cause` - original exception or reason for transport failures
 
   ## Examples
 
@@ -59,10 +59,10 @@ defmodule AzureSDK.Error do
 
   ## Parameters
 
-  * `service` — service atom stored on the error
-  * `status` — HTTP status code
-  * `headers` — response headers (string keys; lookup is case-insensitive for `x-ms-request-id`)
-  * `body` — response body, often Azure error XML; may be `nil` or empty
+  * `service` - service atom stored on the error
+  * `status` - HTTP status code
+  * `headers` - response headers (string keys; lookup is case-insensitive for `x-ms-request-id`)
+  * `body` - response body, often Azure error XML; may be `nil` or empty
 
   ## Returns
 
@@ -95,8 +95,8 @@ defmodule AzureSDK.Error do
 
   ## Parameters
 
-  * `service` — service atom stored on the error
-  * `reason` — exception struct or any term; stored in `:cause`
+  * `service` - service atom stored on the error
+  * `reason` - exception struct or any term; stored in `:cause`
 
   ## Returns
 

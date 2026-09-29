@@ -11,36 +11,36 @@ A BEAM-native SDK leverages these by design.
 ## Layered Architecture
 
 ```
-Service Modules (Blob, S3)     — Public API
-Service Clients                — Configuration
-Core Pipeline                  — Cross-cutting concerns
-Identity / Credentials         — Authentication
-Transport (Req → Finch → Mint) — HTTP
+Service Modules (Blob, S3)     - Public API
+Service Clients                - Configuration
+Core Pipeline                  - Cross-cutting concerns
+Identity / Credentials         - Authentication
+Transport (Req → Finch → Mint) - HTTP
 ```
 
 Service modules never import HTTP libraries.
 
 ## Design Principles
 
-**1. Clients are data, not processes** — passable structs, not hidden Agents.
+**1. Clients are data, not processes** - passable structs, not hidden Agents.
 
-**2. Credentials are values** — construct at app boundary, pass to clients.
+**2. Credentials are values** - construct at app boundary, pass to clients.
 
-**3. Pipelines compose middleware** — auth, retry, telemetry as modules.
+**3. Pipelines compose middleware** - auth, retry, telemetry as modules.
 
-**4. Errors are structs** — `{:error, %Error{status:, code:, ...}}`.
+**4. Errors are structs** - `{:error, %Error{status:, code:, ...}}`.
 
-**5. Internal formats stay internal** — parse XML/JSON, return maps.
+**5. Internal formats stay internal** - parse XML/JSON, return maps.
 
-**6. Telemetry at two levels** — operations (business) and requests (infra).
+**6. Telemetry at two levels** - operations (business) and requests (infra).
 
 ## OTP Patterns
 
-**TokenCache (v0.2.0)** — supervised process, single refresh point.
+**TokenCache (v0.2.0)** - supervised process, single refresh point.
 
-**Broadway (v0.6.0)** — blob producer with backpressure.
+**Broadway (v0.6.0)** - blob producer with backpressure.
 
-**Flow (v0.6.0)** — parallel uploads with `Flow.map`.
+**Flow (v0.6.0)** - parallel uploads with `Flow.map`.
 
 ## Testing
 
@@ -65,9 +65,9 @@ end
 
 ## Documentation as Code
 
-- `plans/` — why
-- `guides/` — how to think
-- `livebooks/` — how to do (CI-validated)
+- `plans/` - why
+- `guides/` - how to think
+- `livebooks/` - how to do (CI-validated)
 
 ## v0.1.0 Lessons
 

@@ -31,13 +31,13 @@ Metadata for telemetry: `service`, `operation`, `method`, `path`.
 
 ### 2. Signing
 
-`sign/2` dispatches through the `Credential.sign_request/2` behaviour callback:
+Authorization dispatches on the credential type. Token credentials go through `TokenCache.fetch/3` and `Pipeline.Bearer`; request credentials go through `Credential.authorize_request/2`:
 
 | Credential | Implementation | Result |
 |------------|----------------|--------|
 | `SharedKeyCredential` | `Pipeline.SharedKey` | `Authorization: SharedKey account:sig` |
 | `SASCredential` | `Pipeline.SAS` | SAS query params merged |
-| OAuth credentials (future) | per-credential module | Bearer token header |
+| `TokenCredential` (Entra ID) | `TokenCache` + `Pipeline.Bearer` | `Authorization: Bearer <token>` |
 
 **SharedKey** ensures `x-ms-date` and `x-ms-version`, removes empty headers, computes HMAC-SHA256, emits `[:azure_sdk, :auth, :sign]`.
 
@@ -70,7 +70,7 @@ Status 200–299 → `{:ok, response}`. Otherwise `{:error, Error.from_response/
 
 ## Request Struct
 
-Service modules build `AzureSDK.Core.Request` — the pipeline never imports `Storage.Blob`:
+Service modules build `AzureSDK.Core.Request` - the pipeline never imports `Storage.Blob`:
 
 ```elixir
 %Request{method: :put, path: "/c/b", query: [], headers: %{},
@@ -92,7 +92,7 @@ Future: `Pipeline.Bearer` (OAuth), `Pipeline.LRO` (ARM polling).
 ## Design Constraints
 
 1. Pipeline must not depend on service modules.
-2. Req retry is disabled — AzureSDK owns retry logic.
+2. Req retry is disabled - AzureSDK owns retry logic.
 3. Re-sign on every retry attempt (fresh timestamp).
 4. Per-request `opts` pass through to Req for timeouts.
 
@@ -104,6 +104,6 @@ Future: `Pipeline.Bearer` (OAuth), `Pipeline.LRO` (ARM polling).
 
 ## Related Documents
 
-- `req-integration.md` — Req/Finch/Mint transport
-- `telemetry-design.md` — all emitted events
-- `identity-architecture.md` — credential signing
+- `req-integration.md` - Req/Finch/Mint transport
+- `telemetry-design.md` - all emitted events
+- `identity-architecture.md` - credential signing

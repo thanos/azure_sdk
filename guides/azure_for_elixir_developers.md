@@ -40,19 +40,19 @@ client = Storage.Client.new(
 )
 ```
 
-The Azurite key is public — local use only.
+The Azurite key is public - local use only.
 
 ## Authentication
 
-**Shared Key (v0.1.0)** — full account access for server-side apps.
+**Shared Key** - full account access for server-side apps.
 
-**SAS (v0.1.0)** — time-limited scoped access:
+**SAS** - time-limited scoped access:
 
 ```elixir
 SASCredential.new("sv=2024-11-04&ss=b&sp=r&se=...")
 ```
 
-**Azure AD (v0.2.0)** — OAuth bearer tokens, no shared keys.
+**Microsoft Entra ID (v0.2.0)** - OAuth bearer tokens, no shared keys. See `guides/azure_identity.md`.
 
 ## Error Handling
 
@@ -82,9 +82,9 @@ end, nil)
 
 ## What It Isn't (Yet)
 
-- Full Azure SDK — Queue, Table, Management in later releases
-- SAS generator — v0.1.0 consumes SAS only
-- Terraform replacement — use Management plane (v0.5.0) for provisioning
+- Full Azure SDK - Queue, Table, Management in later releases
+- SAS generator - AzureSDK consumes SAS tokens but does not create them yet
+- Terraform replacement - use Management plane (v0.6.0) for provisioning
 
 ## Next Steps
 

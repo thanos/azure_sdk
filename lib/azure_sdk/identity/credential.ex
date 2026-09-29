@@ -27,13 +27,13 @@ defmodule AzureSDK.Identity.Credential do
 
   ## Parameters
 
-  * `credential` — behaviour implementer
-  * `request` — `AzureSDK.Core.Request`
+  * `credential` - behaviour implementer
+  * `request` - `AzureSDK.Core.Request`
 
   ## Returns
 
-  * `{:ok, request}` — authorized request
-  * `{:error, %AzureSDK.Error{}}` — authorization failed
+  * `{:ok, request}` - authorized request
+  * `{:error, %AzureSDK.Error{}}` - authorization failed
 
   Implementations should not raise for expected failures.
   """

@@ -27,8 +27,8 @@ defmodule AzureSDK.Pipeline.Bearer do
 
   ## Parameters
 
-  * `request` — `AzureSDK.Core.Request`
-  * `token` — `AzureSDK.Identity.AccessToken`
+  * `request` - `AzureSDK.Core.Request`
+  * `token` - `AzureSDK.Identity.AccessToken`
 
   ## Returns
 

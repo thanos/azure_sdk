@@ -4,15 +4,15 @@ defmodule AzureSDK.Core.Request do
 
   ## Fields
 
-  * `:method` — HTTP method atom (`:get`, `:put`, `:head`, …); default `:get`
-  * `:path` — URL path beginning with `/`; default `"/"`
-  * `:query` — list of `{name, value}` string pairs
-  * `:headers` — map of header name to value
-  * `:body` — request body as iodata, or `nil`
-  * `:stream` — enumerable body stream, or `nil` (takes precedence over `:body` in the pipeline when set)
-  * `:service` — logical service for telemetry/errors (`:blob`, `:identity`, …)
-  * `:operation` — logical operation name for telemetry
-  * `:metadata` — opaque map for signing and pipeline options (`:api_version`, `:path_style`, `:idempotent`, `:scopes`, …)
+  * `:method` - HTTP method atom (`:get`, `:put`, `:head`, …); default `:get`
+  * `:path` - URL path beginning with `/`; default `"/"`
+  * `:query` - list of `{name, value}` string pairs
+  * `:headers` - map of header name to value
+  * `:body` - request body as iodata, or `nil`
+  * `:stream` - enumerable body stream, or `nil` (takes precedence over `:body` in the pipeline when set)
+  * `:service` - logical service for telemetry/errors (`:blob`, `:identity`, …)
+  * `:operation` - logical operation name for telemetry
+  * `:metadata` - opaque map for signing and pipeline options (`:api_version`, `:path_style`, `:idempotent`, `:scopes`, …)
 
   ## Examples
 
@@ -51,7 +51,7 @@ defmodule AzureSDK.Core.Request do
 
   ## Parameters
 
-  * `fields` — keyword list of struct fields. A list of headers is accepted and
+  * `fields` - keyword list of struct fields. A list of headers is accepted and
     converted to a map.
 
   ## Returns

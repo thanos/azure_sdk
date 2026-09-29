@@ -4,10 +4,10 @@ AzureSDK v0.1.0 ships Blob Storage, but the codebase is organized as a **platfor
 
 ## Design Goals
 
-1. **Mirror Microsoft Azure SDK separation** — identity, data plane, management plane, and shared core are distinct layers.
-2. **Embrace BEAM strengths** — telemetry, supervision, streaming, and future Broadway/Flow integrations are first-class design inputs.
-3. **No hidden state** — clients are plain structs; credentials and retry policies are explicit configuration.
-4. **Service-agnostic pipeline** — `AzureSDK.Core.Pipeline` knows nothing about blobs, queues, or ARM resources.
+1. **Mirror Microsoft Azure SDK separation** - identity, data plane, management plane, and shared core are distinct layers.
+2. **Embrace BEAM strengths** - telemetry, supervision, streaming, and future Broadway/Flow integrations are first-class design inputs.
+3. **No hidden state** - clients are plain structs; credentials and retry policies are explicit configuration.
+4. **Service-agnostic pipeline** - `AzureSDK.Core.Pipeline` knows nothing about blobs, queues, or ARM resources.
 
 ## Layer Diagram
 
@@ -69,7 +69,7 @@ v0.1.0 includes stub modules for Queue, Table, FileShare, DataLake, and all Mana
 
 ## Emulator Support
 
-`Storage.Client.path_style?/1` detects path-style endpoints — those whose path ends with the account name (e.g. Azurite at `http://127.0.0.1:10000/devstoreaccount1`) — and can be forced with the `:path_style` client option. Signing metadata passes `path_style: true` to `SharedKey`, which applies the **double account name** canonicalized resource path required by path-style emulators. Host-style endpoints (public cloud, sovereign clouds, custom domains) sign with a single account prefix.
+`Storage.Client.path_style?/1` detects path-style endpoints - those whose path ends with the account name (e.g. Azurite at `http://127.0.0.1:10000/devstoreaccount1`) - and can be forced with the `:path_style` client option. Signing metadata passes `path_style: true` to `SharedKey`, which applies the **double account name** canonicalized resource path required by path-style emulators. Host-style endpoints (public cloud, sovereign clouds, custom domains) sign with a single account prefix.
 
 ## Error Contract
 
@@ -77,20 +77,20 @@ All public APIs return `{:ok, result}` or `{:error, %AzureSDK.Error{}}`. XML err
 
 ## Testing Architecture
 
-- **Unit tests** — signing canonicalization, XML parsing, retry policy
-- **Property tests** — StreamData for string-to-sign invariants
-- **Integration tests** — Azurite via `AzureSDK.AzuriteCase`, no cloud account required
+- **Unit tests** - signing canonicalization, XML parsing, retry policy
+- **Property tests** - StreamData for string-to-sign invariants
+- **Integration tests** - Azurite via `AzureSDK.AzuriteCase`, no cloud account required
 
 ## Key Architectural Constraints
 
-1. Blob modules must not implement signing logic — that belongs in `AzureSDK.Pipeline.SharedKey`.
+1. Blob modules must not implement signing logic - that belongs in `AzureSDK.Pipeline.SharedKey`.
 2. XML must not leak past `AzureSDK.Core.Xml.*` parsers.
 3. New credentials implement `AzureSDK.Identity.Credential` behaviour and plug into `Pipeline.sign/2`.
 4. Transport stays on Req; do not bypass the pipeline for "quick" HTTP calls.
 
 ## Related Documents
 
-- `pipeline-design.md` — middleware chain details
-- `identity-architecture.md` — credential plane and OAuth roadmap
-- `data-plane-vs-management-plane.md` — ARM vs storage service APIs
-- `README.md` (Roadmap) — version-by-version delivery plan
+- `pipeline-design.md` - middleware chain details
+- `identity-architecture.md` - credential plane and OAuth roadmap
+- `data-plane-vs-management-plane.md` - ARM vs storage service APIs
+- `README.md` (Roadmap) - version-by-version delivery plan

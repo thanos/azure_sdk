@@ -10,8 +10,12 @@ defmodule AzureSDK.Identity.TokenCache do
 
   ## State fields
 
-  * `:tokens` — map of `{cache_key, sorted_scopes}` to `AccessToken`
-  * `:inflight` — waiters for in-progress acquisitions
+  * `:tokens` - map of `{cache_key, sorted_scopes}` to `AccessToken`
+  * `:inflight` - acquiring process and waiters for in-progress acquisitions
+
+  Expired tokens are pruned whenever a new token is stored. If a credential
+  raises or its acquiring process exits, every waiter receives
+  `{:error, %AzureSDK.Error{code: "TokenAcquisitionFailed"}}`.
 
   ## Examples
 
@@ -22,6 +26,8 @@ defmodule AzureSDK.Identity.TokenCache do
 
   use GenServer
 
+  alias AzureSDK.Core.Telemetry
+  alias AzureSDK.Error
   alias AzureSDK.Identity.{AccessToken, TokenCredential}
 
   @default_buffer_seconds 300
@@ -30,7 +36,7 @@ defmodule AzureSDK.Identity.TokenCache do
   @typedoc "Internal GenServer state. Not part of the public API surface."
   @type state :: %{
           tokens: %{term() => AccessToken.t()},
-          inflight: %{term() => [pid()]}
+          inflight: %{term() => %{pid: pid(), waiters: [GenServer.from()]}}
         }
 
   @doc false
@@ -44,18 +50,18 @@ defmodule AzureSDK.Identity.TokenCache do
 
   ## Parameters
 
-  * `credential` — `TokenCredential` implementer
-  * `scopes` — list of OAuth scope strings
-  * `opts` — optional keyword list:
-    * `:buffer_seconds` — refresh buffer before expiry (default `300`)
-    * `:server` — GenServer name (default `AzureSDK.Identity.TokenCache`)
-    * `:force_refresh` — when `true`, bypass cache and re-acquire
-    * other keys — forwarded to `TokenCredential.get_token/3`
+  * `credential` - `TokenCredential` implementer
+  * `scopes` - list of OAuth scope strings
+  * `opts` - optional keyword list:
+    * `:buffer_seconds` - refresh buffer before expiry (default `300`)
+    * `:server` - GenServer name (default `AzureSDK.Identity.TokenCache`)
+    * `:force_refresh` - when `true`, bypass cache and re-acquire
+    * other keys - forwarded to `TokenCredential.get_token/3`
 
   ## Returns
 
   * `{:ok, %AzureSDK.Identity.AccessToken{}}`
-  * `{:error, %AzureSDK.Error{}}` — acquisition failure
+  * `{:error, %AzureSDK.Error{}}` - acquisition failure
 
   Raises if the cache GenServer is not running (`exit` / call timeout).
 
@@ -84,13 +90,9 @@ defmodule AzureSDK.Identity.TokenCache do
 
   ## Parameters
 
-  * `credential` — token credential
-  * `scopes` — same scopes used for `fetch/3`
-  * `opts` — optional `:server` name
-
-  ## Returns
-
-  `:ok`
+  * `credential` - token credential
+  * `scopes` - same scopes used for `fetch/3`
+  * `opts` - optional `:server` name
 
   ## Examples
 
@@ -108,15 +110,12 @@ defmodule AzureSDK.Identity.TokenCache do
   @doc """
   Clears the entire cache.
 
-  Intended for tests. Removes all tokens and inflight waiters.
+  Intended for tests. Removes all tokens. Callers waiting on an in-progress
+  acquisition receive `{:error, %AzureSDK.Error{code: "TokenAcquisitionFailed"}}`.
 
   ## Options
 
-  * `:server` — GenServer name (default `AzureSDK.Identity.TokenCache`)
-
-  ## Returns
-
-  `:ok`
+  * `:server` - GenServer name (default `AzureSDK.Identity.TokenCache`)
 
   ## Examples
 
@@ -136,39 +135,21 @@ defmodule AzureSDK.Identity.TokenCache do
 
   @impl true
   def handle_call({:fetch, key, credential, scopes, opts, buffer, force?}, from, state) do
+    cached = Map.get(state.tokens, key)
+
     cond do
-      not force? and match?(%AccessToken{}, Map.get(state.tokens, key)) and
-          not AccessToken.stale?(state.tokens[key], buffer) ->
-        emit_cache(:hit, key)
-        {:reply, {:ok, state.tokens[key]}, state}
+      not force? and match?(%AccessToken{}, cached) and not AccessToken.stale?(cached, buffer) ->
+        Telemetry.emit_token_cache(:hit, %{cache_key_type: cache_key_type(key)})
+        {:reply, {:ok, cached}, state}
 
       Map.has_key?(state.inflight, key) ->
-        emit_cache(:miss, key)
-        waiters = [from | Map.get(state.inflight, key, [])]
-        {:noreply, put_in(state.inflight[key], waiters)}
+        Telemetry.emit_token_cache(:miss, %{cache_key_type: cache_key_type(key)})
+        {:noreply, update_in(state.inflight[key].waiters, &[from | &1])}
 
       true ->
-        emit_cache(:miss, key)
-        parent = self()
-
-        Task.start(fn ->
-          start = System.monotonic_time()
-          result = TokenCredential.get_token(credential, scopes, opts)
-          duration = System.monotonic_time() - start
-
-          :telemetry.execute(
-            [:azure_sdk, :auth, :token, :acquire],
-            %{duration: duration, count: 1},
-            %{
-              result: elem_result(result),
-              cache_key_type: cache_key_type(key)
-            }
-          )
-
-          send(parent, {:token_acquired, key, result})
-        end)
-
-        {:noreply, put_in(state.inflight[key], [from])}
+        Telemetry.emit_token_cache(:miss, %{cache_key_type: cache_key_type(key)})
+        pid = start_acquire(key, credential, scopes, opts)
+        {:noreply, put_in(state.inflight[key], %{pid: pid, waiters: [from]})}
     end
   end
 
@@ -176,39 +157,92 @@ defmodule AzureSDK.Identity.TokenCache do
     {:reply, :ok, %{state | tokens: Map.delete(state.tokens, key)}}
   end
 
-  def handle_call(:clear, _from, _state) do
+  def handle_call(:clear, _from, state) do
+    error = acquire_error("Token cache was cleared while the token was being acquired")
+
+    Enum.each(state.inflight, fn {_key, %{waiters: waiters}} ->
+      Enum.each(waiters, &GenServer.reply(&1, {:error, error}))
+    end)
+
     {:reply, :ok, %{tokens: %{}, inflight: %{}}}
   end
 
   @impl true
-  def handle_info({:token_acquired, key, result}, state) do
-    waiters = Map.get(state.inflight, key, [])
-    state = update_in(state.inflight, &Map.delete(&1, key))
+  def handle_info({:token_acquired, pid, key, result}, state) do
+    case Map.get(state.inflight, key) do
+      %{pid: ^pid, waiters: waiters} ->
+        state = update_in(state.inflight, &Map.delete(&1, key))
+        state = maybe_store(state, key, result)
+        Enum.each(waiters, &GenServer.reply(&1, result))
+        {:noreply, state}
 
-    state =
-      case result do
-        {:ok, %AccessToken{} = token} ->
-          put_in(state.tokens[key], token)
-
-        {:error, _} ->
-          state
-      end
-
-    Enum.each(waiters, fn from -> GenServer.reply(from, result) end)
-    {:noreply, state}
+      _ ->
+        {:noreply, state}
+    end
   end
 
-  defp emit_cache(kind, key) do
-    :telemetry.execute(
-      [:azure_sdk, :auth, :token_cache, kind],
-      %{count: 1},
-      %{cache_key_type: cache_key_type(key)}
-    )
+  # The acquiring process sends :token_acquired before exiting, so by the time
+  # its :DOWN arrives the inflight entry is already gone. An entry that is still
+  # present means the process died without reporting a result.
+  def handle_info({:DOWN, _ref, :process, pid, reason}, state) do
+    case Enum.find(state.inflight, fn {_key, entry} -> entry.pid == pid end) do
+      {key, %{waiters: waiters}} ->
+        error = acquire_error("Token acquisition process exited: #{inspect(reason)}")
+        Enum.each(waiters, &GenServer.reply(&1, {:error, error}))
+        {:noreply, update_in(state.inflight, &Map.delete(&1, key))}
+
+      nil ->
+        {:noreply, state}
+    end
+  end
+
+  defp start_acquire(key, credential, scopes, opts) do
+    parent = self()
+
+    {pid, _ref} =
+      spawn_monitor(fn ->
+        start = System.monotonic_time()
+        result = safe_get_token(credential, scopes, opts)
+        duration = System.monotonic_time() - start
+
+        :telemetry.execute(
+          [:azure_sdk, :auth, :token, :acquire],
+          %{duration: duration, count: 1},
+          %{result: elem(result, 0), cache_key_type: cache_key_type(key)}
+        )
+
+        send(parent, {:token_acquired, self(), key, result})
+      end)
+
+    pid
+  end
+
+  defp safe_get_token(credential, scopes, opts) do
+    case TokenCredential.get_token(credential, scopes, opts) do
+      {:ok, %AccessToken{}} = ok -> ok
+      {:error, %Error{}} = error -> error
+    end
+  rescue
+    exception -> {:error, Error.from_exception(:identity, exception)}
+  catch
+    kind, reason -> {:error, acquire_error("Credential #{kind}: #{inspect(reason)}")}
+  end
+
+  defp maybe_store(state, key, {:ok, %AccessToken{} = token}) do
+    tokens =
+      state.tokens
+      |> Map.reject(fn {_key, cached} -> AccessToken.stale?(cached, 0) end)
+      |> Map.put(key, token)
+
+    %{state | tokens: tokens}
+  end
+
+  defp maybe_store(state, _key, {:error, _}), do: state
+
+  defp acquire_error(message) do
+    Error.new(code: "TokenAcquisitionFailed", message: message, service: :identity)
   end
 
   defp cache_key_type({cred_key, _scopes}) when is_tuple(cred_key), do: elem(cred_key, 0)
   defp cache_key_type(_), do: :unknown
-
-  defp elem_result({:ok, _}), do: :ok
-  defp elem_result({:error, _}), do: :error
 end

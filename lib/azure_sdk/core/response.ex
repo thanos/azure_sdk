@@ -4,10 +4,10 @@ defmodule AzureSDK.Core.Response do
 
   ## Fields
 
-  * `:status` — HTTP status code
-  * `:headers` — lowercased header map with single string values
-  * `:body` — response body as a binary, or `nil`
-  * `:request` — originating `AzureSDK.Core.Request` when available
+  * `:status` - HTTP status code
+  * `:headers` - lowercased header map with single string values
+  * `:body` - response body as a binary, or `nil`
+  * `:request` - originating `AzureSDK.Core.Request` when available
 
   ## Examples
 
@@ -31,8 +31,8 @@ defmodule AzureSDK.Core.Response do
 
   ## Parameters
 
-  * `resp` — Req response
-  * `request` — optional originating request (default `nil`)
+  * `resp` - Req response
+  * `request` - optional originating request (default `nil`)
 
   ## Returns
 

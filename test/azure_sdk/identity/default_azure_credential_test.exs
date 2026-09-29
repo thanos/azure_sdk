@@ -2,7 +2,7 @@ defmodule AzureSDK.Identity.DefaultAzureCredentialTest do
   use ExUnit.Case, async: true
 
   alias AzureSDK.Error
-  alias AzureSDK.Identity.{AccessToken, DefaultAzureCredential, TokenCredential}
+  alias AzureSDK.Identity.{AccessToken, DefaultAzureCredential, TokenCache, TokenCredential}
 
   defmodule FailingCred do
     @behaviour TokenCredential
@@ -17,12 +17,12 @@ defmodule AzureSDK.Identity.DefaultAzureCredentialTest do
 
   defmodule SucceedingCred do
     @behaviour TokenCredential
-    defstruct []
+    defstruct token: "ok-token"
 
-    def cache_key(%__MODULE__{}), do: :succeeding
+    def cache_key(%__MODULE__{token: token}), do: {:succeeding, token}
 
-    def get_token(%__MODULE__{}, _scopes, _opts) do
-      {:ok, AccessToken.new("ok-token", DateTime.add(DateTime.utc_now(), 3600, :second))}
+    def get_token(%__MODULE__{token: token}, _scopes, _opts) do
+      {:ok, AccessToken.new(token, DateTime.add(DateTime.utc_now(), 3600, :second))}
     end
   end
 
@@ -40,16 +40,51 @@ defmodule AzureSDK.Identity.DefaultAzureCredentialTest do
              TokenCredential.get_token(cred, ["https://storage.azure.com/.default"])
   end
 
-  test "returns last error when all fail" do
+  test "returns the last CredentialUnavailable when nothing is usable" do
     cred =
       DefaultAzureCredential.new(
         credentials: [
           %FailingCred{code: "CredentialUnavailable"},
-          %FailingCred{code: "boom"}
+          %FailingCred{code: "CredentialUnavailable"}
         ]
       )
 
-    assert {:error, %{code: "boom"}} =
+    assert {:error, %{code: "CredentialUnavailable"}} =
              TokenCredential.get_token(cred, ["https://storage.azure.com/.default"])
+  end
+
+  test "stops at the first error that is not CredentialUnavailable" do
+    cred =
+      DefaultAzureCredential.new(
+        credentials: [
+          %FailingCred{code: "CredentialUnavailable"},
+          %FailingCred{code: "invalid_client"},
+          %SucceedingCred{}
+        ]
+      )
+
+    assert {:error, %{code: "invalid_client"}} =
+             TokenCredential.get_token(cred, ["https://storage.azure.com/.default"])
+  end
+
+  test "default chain is environment then managed identity" do
+    cred = DefaultAzureCredential.new(env: %{})
+
+    assert [
+             %AzureSDK.Identity.EnvironmentCredential{},
+             %AzureSDK.Identity.ManagedIdentityCredential{}
+           ] =
+             cred.credentials
+  end
+
+  test "chains with different identities do not share cached tokens" do
+    server = :"dac_cache_#{System.unique_integer([:positive])}"
+    start_supervised!({TokenCache, name: server})
+
+    a = DefaultAzureCredential.new(credentials: [%SucceedingCred{token: "identity-a"}])
+    b = DefaultAzureCredential.new(credentials: [%SucceedingCred{token: "identity-b"}])
+
+    assert {:ok, %AccessToken{token: "identity-a"}} = TokenCache.fetch(a, ["s"], server: server)
+    assert {:ok, %AccessToken{token: "identity-b"}} = TokenCache.fetch(b, ["s"], server: server)
   end
 end

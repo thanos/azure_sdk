@@ -4,13 +4,13 @@ defmodule AzureSDK.Storage.Client do
 
   ## Fields
 
-  * `:account` — storage account name
-  * `:credential` — Shared Key, SAS, or token credential
-  * `:endpoint` — absolute service URL
-  * `:api_version` — Storage REST API version (`AzureSDK.Storage.ServiceVersion`)
-  * `:path_style` — when `true`, Shared Key uses double-account canonicalization
-  * `:retry` — retry policy
-  * `:req_options` — extra Req options
+  * `:account` - storage account name
+  * `:credential` - Shared Key, SAS, or token credential
+  * `:endpoint` - absolute service URL
+  * `:api_version` - Storage REST API version (`AzureSDK.Storage.ServiceVersion`)
+  * `:path_style` - when `true`, Shared Key uses double-account canonicalization
+  * `:retry` - retry policy
+  * `:req_options` - extra Req options
 
   ## Path-style endpoints
 
@@ -58,14 +58,15 @@ defmodule AzureSDK.Storage.Client do
 
   ## Options
 
-  * `:account` (required) — storage account name
-  * `:credential` (required) — identity credential
-  * `:endpoint` — custom endpoint (defaults by `:service`)
-  * `:service` — `:blob` (default), `:queue`, `:table`, or `:file` when building the default endpoint
-  * `:api_version` — defaults to `ServiceVersion.default/0`
-  * `:path_style` — path-style signing flag
-  * `:retry` — retry policy map
-  * `:req_options` — additional Req options
+  * `:account` (required) - storage account name
+  * `:credential` (required) - identity credential
+  * `:endpoint` - custom endpoint (defaults by `:service`)
+  * `:service` - `:blob` (default), `:queue`, `:table`, or `:file` when building the default endpoint
+  * `:api_version` - defaults to `ServiceVersion.default/0`. Not validated;
+    call `ServiceVersion.validate/1` first to reject unknown versions
+  * `:path_style` - path-style signing flag
+  * `:retry` - retry policy map
+  * `:req_options` - additional Req options
 
   ## Errors
 

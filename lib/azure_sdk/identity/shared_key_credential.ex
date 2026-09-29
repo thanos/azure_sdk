@@ -8,8 +8,8 @@ defmodule AzureSDK.Identity.SharedKeyCredential do
 
   ## Fields
 
-  * `:account` — storage account name
-  * `:key` — Base64-encoded account access key
+  * `:account` - storage account name
+  * `:key` - Base64-encoded account access key (hidden from `inspect/2`)
 
   ## Examples
 
@@ -29,6 +29,7 @@ defmodule AzureSDK.Identity.SharedKeyCredential do
           key: String.t()
         }
 
+  @derive {Inspect, except: [:key]}
   defstruct [:account, :key]
 
   @doc """
@@ -36,8 +37,8 @@ defmodule AzureSDK.Identity.SharedKeyCredential do
 
   ## Parameters
 
-  * `account` — storage account name
-  * `key` — Base64-encoded access key (not the raw secret bytes)
+  * `account` - storage account name
+  * `key` - Base64-encoded access key (not the raw secret bytes)
 
   ## Returns
 
@@ -58,8 +59,11 @@ defmodule AzureSDK.Identity.SharedKeyCredential do
 
   ## Returns
 
-  Always `{:ok, request}` for valid credentials. Raises `ArgumentError` if the
-  key is not valid Base64 when signing.
+  * `{:ok, request}` - signed request
+  * `{:error, %AzureSDK.Error{code: "InvalidCredential"}}` - the key is not
+    valid Base64
+
+  Does not raise.
 
   ## Examples
 
@@ -76,6 +80,17 @@ defmodule AzureSDK.Identity.SharedKeyCredential do
   """
   @impl AzureSDK.Identity.Credential
   def authorize_request(%__MODULE__{} = credential, request) do
-    {:ok, AzureSDK.Pipeline.SharedKey.apply(request, credential)}
+    case Base.decode64(credential.key) do
+      {:ok, _} ->
+        {:ok, AzureSDK.Pipeline.SharedKey.apply(request, credential)}
+
+      :error ->
+        {:error,
+         AzureSDK.Error.new(
+           code: "InvalidCredential",
+           message: "Shared Key for account #{inspect(credential.account)} is not valid Base64",
+           service: request.service
+         )}
+    end
   end
 end
