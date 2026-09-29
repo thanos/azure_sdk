@@ -6,15 +6,26 @@ Mix.install([
 ])
 ```
 
-## Azurite setup
+## Overview
 
-Start Azurite with Docker:
+This notebook creates a Shared Key client against local Azurite, creates a container,
+uploads a blob, and prints the blob name.
+
+Requires Azurite:
 
 ```bash
 docker compose up -d
 ```
 
+Package version:
+
+```elixir
+AzureSDK.version()
+```
+
 ## Create a client
+
+Path-style endpoints (Azurite) are detected when the URL ends with the account name.
 
 ```elixir
 credential =
@@ -29,6 +40,8 @@ client =
     credential: credential,
     endpoint: "http://127.0.0.1:10000/devstoreaccount1"
   )
+
+{client.endpoint, AzureSDK.Storage.Client.path_style?(client)}
 ```
 
 ## First upload
@@ -36,7 +49,22 @@ client =
 ```elixir
 container = "livebook-demo"
 
-{:ok, _} = AzureSDK.Storage.Container.create(client, container)
-{:ok, blob} = AzureSDK.Storage.Blob.upload(client, container, "hello.txt", "Hello from Livebook!")
+unless AzureSDK.Storage.Container.exists?(client, container) do
+  {:ok, _} = AzureSDK.Storage.Container.create(client, container)
+end
+
+{:ok, blob} =
+  AzureSDK.Storage.Blob.upload(client, container, "hello.txt", "Hello from Livebook!",
+    content_type: "text/plain"
+  )
+
 blob.name
+```
+
+## Clean up
+
+```elixir
+{:ok, :deleted} = AzureSDK.Storage.Blob.delete(client, container, "hello.txt")
+{:ok, :deleted} = AzureSDK.Storage.Container.delete(client, container)
+:ok
 ```

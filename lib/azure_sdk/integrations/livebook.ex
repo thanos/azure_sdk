@@ -1,3 +1,4 @@
 defmodule AzureSDK.Integrations.Livebook do
-  @moduledoc "Livebook helpers. See `livebooks/` for executable notebooks."
+  @moduledoc false
+  # See livebooks/ for executable notebooks.
 end

@@ -18,7 +18,7 @@ See [`plans/azurex-review.md`](https://github.com/thanos/azure_sdk/blob/main/pla
 ```elixir
 # Remove: {:azurex, "~> 1.1"}
 # Add:
-{:azure_sdk, "~> 0.1.0"}
+{:azure_sdk, "~> 0.2.0"}
 ```
 
 ## Client Setup

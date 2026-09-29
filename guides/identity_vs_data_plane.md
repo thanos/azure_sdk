@@ -4,14 +4,14 @@ Two distinct Azure API layers. Confusing them causes wrong endpoints and auth fa
 
 ## The Two Planes
 
-**Data plane** — read/write storage content:
+**Data plane** - read/write storage content:
 
 ```
 PUT https://myaccount.blob.core.windows.net/photos/vacation.jpg
 Authorization: SharedKey myaccount:abc123...
 ```
 
-**Management plane** — provision/configure resources via ARM:
+**Management plane** - provision/configure resources via ARM:
 
 ```
 PUT https://management.azure.com/subscriptions/{sub}/.../storageAccounts/foo
@@ -36,13 +36,13 @@ Authorization: Bearer eyJ0eXAi...
 ## AzureSDK Modules
 
 ```
-Data: Blob, Container (v0.1.0), Queue/Table (future)
-Mgmt: Management.* (v0.5.0 stubs)
+Data: Blob, Container, Queue/Table (future)
+Mgmt: Management.* (v0.6.0 stubs)
 ```
 
 ## Credentials
 
-**Data (v0.1.0):** `SharedKeyCredential`, `SASCredential`
+**Data:** `SharedKeyCredential`, `SASCredential`, or any Entra `TokenCredential` (scope `https://storage.azure.com/.default`)
 
 **Management (v0.2.0+):** `ClientSecretCredential`, `ManagedIdentityCredential`
 
@@ -50,12 +50,12 @@ Scope: `https://management.azure.com/.default`
 
 ## Same Pipeline
 
-Both use `Core.Pipeline.run/3`. Credential type determines signing — service modules don't branch on plane.
+Both use `Core.Pipeline.run/3`. Credential type determines signing - service modules don't branch on plane.
 
 ## Typical App Flow
 
-1. Management: create storage account (v0.5.0)
-2. Management: configure firewall (v0.5.0)
+1. Management: create storage account (v0.6.0)
+2. Management: configure firewall (v0.6.0)
 3. Data: upload logs (v0.1.0 ✓)
 4. Data: download uploads (v0.1.0 ✓)
 

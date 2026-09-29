@@ -69,6 +69,42 @@ defmodule AzureSDK.Storage.ContainerTest do
     assert {:ok, %{"owner" => "team"}} = Container.metadata(client, "uploads")
   end
 
+  test "exists? returns true when container is present", %{bypass: bypass, client: client} do
+    AzureMock.stub_head_container(bypass, "uploads")
+
+    assert Container.exists?(client, "uploads") == true
+  end
+
+  test "exists? returns false when container is missing", %{
+    bypass: bypass,
+    client: client,
+    account: account
+  } do
+    AzureMock.stub_error(
+      bypass,
+      "HEAD",
+      AzureMock.path(["missing"], account),
+      404,
+      "ContainerNotFound",
+      "The specified container does not exist."
+    )
+
+    assert Container.exists?(client, "missing") == false
+  end
+
+  test "exists? propagates non-404 errors", %{bypass: bypass, client: client, account: account} do
+    AzureMock.stub_error(
+      bypass,
+      "HEAD",
+      AzureMock.path(["uploads"], account),
+      403,
+      "AuthorizationFailure",
+      "Forbidden"
+    )
+
+    assert {:error, %{status: 403}} = Container.exists?(client, "uploads")
+  end
+
   test "returns azure error on failure", %{bypass: bypass, client: client, account: account} do
     AzureMock.stub_error(
       bypass,

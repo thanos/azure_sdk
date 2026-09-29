@@ -25,7 +25,7 @@ Modern Elixir HTTP: composable, Finch pooling, Mint protocol, active maintenance
 Req.request(method: :get, url: url, retry: false)
 ```
 
-AzureSDK disables Req retry — Azure-specific codes and `[:azure_sdk, :retry]` telemetry need custom logic.
+AzureSDK disables Req retry - Azure-specific codes and `[:azure_sdk, :retry]` telemetry need custom logic.
 
 ## Pipeline Step Example
 
@@ -35,7 +35,7 @@ def apply(%Request{} = request, %SharedKeyCredential{} = cred) do
 end
 ```
 
-Pure functions on structs — unit testable without network.
+Pure functions on structs - unit testable without network.
 
 ## Chain Orchestration
 

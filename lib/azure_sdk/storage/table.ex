@@ -1,7 +1,4 @@
 defmodule AzureSDK.Storage.Table do
-  @moduledoc """
-  Azure Table Storage client namespace.
-
-  Planned for v0.4.0. See `plans/roadmap.md`.
-  """
+  @moduledoc false
+  # Namespace reserved for v0.5.0 Table Storage. See README.md#roadmap.
 end

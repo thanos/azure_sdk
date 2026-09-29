@@ -14,14 +14,14 @@ Official Azure SDKs have optional OTel; AzureSDK emits events with zero config.
 
 ## Two Event Levels
 
-**Operations** — what the user called (once per API call):
+**Operations** - what the user called (once per API call):
 
 ```elixir
 Telemetry.emit_operation(:blob, :put, %{container: c, name: n})
 # => [:azure_sdk, :blob, :put]
 ```
 
-**Requests** — what the pipeline executed (includes retries):
+**Requests** - what the pipeline executed (includes retries):
 
 ```elixir
 Telemetry.span(metadata, fn -> execute_with_retry(...) end)
@@ -71,7 +71,7 @@ Never in metadata: keys, SAS sigs, tokens, Authorization values, request bodies.
 
 ## Duration
 
-Native time units — convert in handlers:
+Native time units - convert in handlers:
 
 ```elixir
 System.convert_time_unit(d, :native, :millisecond)

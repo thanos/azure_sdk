@@ -21,3 +21,10 @@ azure_sdk-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+.tool-versions
+/baoulo/
+SESSION.md
+RELEASE_NOTES.md
+.DS_Store
+*-repository-hygiene-prompt.md
+*-repository-hygiene.md

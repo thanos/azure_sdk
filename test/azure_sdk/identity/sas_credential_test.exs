@@ -30,11 +30,11 @@ defmodule AzureSDK.Identity.SASCredentialTest do
     assert {"sig", "abc"} in signed.query
   end
 
-  test "signs through credential behaviour" do
+  test "authorizes through credential behaviour" do
     credential = SASCredential.new(%{"sig" => "abc"})
     request = Request.new(method: :get, path: "/")
 
-    signed = Credential.sign_request(credential, request)
+    assert {:ok, signed} = Credential.authorize_request(credential, request)
     assert {"sig", "abc"} in signed.query
   end
 end

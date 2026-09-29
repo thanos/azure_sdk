@@ -2,9 +2,9 @@ defmodule AzureSDK do
   @moduledoc """
   AzureSDK is a long-term Azure platform SDK for Elixir and Erlang.
 
-  v0.1.0 implements Blob Storage on top of a reusable core pipeline,
-  identity plane, and telemetry system designed to grow into a full
-  multi-service Azure SDK.
+  v0.2.0 adds Entra ID / OAuth credentials, a supervised token cache,
+  fallible authorization, and idempotency-aware retries on top of
+  the Blob Storage foundation.
 
   ## Quick start
 
@@ -20,13 +20,34 @@ defmodule AzureSDK do
           credential: credential
         )
 
-      {:ok, container} = AzureSDK.Storage.Container.create(client, "uploads")
-      {:ok, blob} = AzureSDK.Storage.Blob.upload(client, "uploads", "file.txt", "hello")
+      {:ok, _container} = AzureSDK.Storage.Container.create(client, "uploads")
+      {:ok, _blob} = AzureSDK.Storage.Blob.upload(client, "uploads", "file.txt", "hello")
 
-  See the guides in `guides/` and livebooks in `livebooks/` for deeper coverage.
+  ## Entra ID
+
+      credential =
+        AzureSDK.Identity.ClientSecretCredential.new(
+          tenant_id: System.fetch_env!("AZURE_TENANT_ID"),
+          client_id: System.fetch_env!("AZURE_CLIENT_ID"),
+          client_secret: System.fetch_env!("AZURE_CLIENT_SECRET")
+        )
+
+  See the guides in `guides/` and Livebooks in `livebooks/` for deeper coverage.
   """
 
-  @doc "Returns the current AzureSDK version."
+  @doc """
+  Returns the current AzureSDK application version string.
+
+  ## Returns
+
+  Version string from the application spec (for example `"0.2.0"`).
+
+  ## Examples
+
+      iex> version = AzureSDK.version()
+      iex> is_binary(version) and String.contains?(version, ".")
+      true
+  """
   @spec version() :: String.t()
   def version do
     Application.spec(:azure_sdk, :vsn) |> to_string()

@@ -18,7 +18,7 @@ Storage.Blob.upload/4 → Core.Pipeline.run/3 → Req.request/1
 
 ### 1. Design Guidelines
 
-[azure.github.io/azure-sdk](https://azure.github.io/azure-sdk/) — naming, errors, versioning.
+[azure.github.io/azure-sdk](https://azure.github.io/azure-sdk/) - naming, errors, versioning.
 
 ### 2. REST API Spec
 
@@ -42,13 +42,13 @@ Capture auth, parsing, pagination, errors, telemetry in `plans/` before code.
 
 ## Key Patterns
 
-**Client options bag** — `req_options`, `retry`, `api_version` on client struct.
+**Client options bag** - `req_options`, `retry`, `api_version` on client struct.
 
-**Credential protocol** — `Credential` behaviour with `sign_request/2`.
+**Credential protocol** - `Credential` behaviour with `authorize_request/2` for Shared Key and SAS, and `TokenCredential` with `get_token/3` for Entra ID.
 
-**LRO polling** — ARM async ops via `Azure-AsyncOperation` header (v0.5.0).
+**LRO polling** - ARM async ops via `Azure-AsyncOperation` header (v0.6.0).
 
-**Pagination** — continuation tokens; v0.1.0 returns first page.
+**Pagination** - continuation tokens; v0.1.0 returns first page.
 
 ## Adopt vs Adapt
 
