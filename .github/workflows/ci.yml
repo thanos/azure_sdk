@@ -100,7 +100,10 @@ jobs:
             _build
           key: ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
       - run: mix deps.get
-      - run: mix test --cover
+      # Coverage is reported by the coveralls job (1.20 / OTP 28).
+      # `mix test --cover` via ExCoveralls crashes on Elixir 1.20 + OTP 27
+      # (`:cover.do_compile_beam2/6` MatchError).
+      - run: mix test
 
   livebooks:
     runs-on: ubuntu-latest
