@@ -12,6 +12,8 @@ AzureSDK is not a Blob Storage library. It is a long-term, multi-service Azure S
 
 **v0.2.0** adds Entra ID / OAuth credentials, a supervised token cache, and idempotency-aware retries on top of the Blob Storage foundation. Queue, Table, Management, and BEAM integrations follow in later releases (see Roadmap below).
 
+See [CHANGELOG](CHANGELOG.md) for breaking changes from v0.1.0 (`sign_request/2` → `authorize_request/2`). Identity guide: [`guides/azure_identity.md`](guides/azure_identity.md).
+
 ## Installation
 
 ```elixir

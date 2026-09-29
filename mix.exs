@@ -65,7 +65,7 @@ defmodule AzureSDK.MixProject do
     [
       maintainers: ["Thanos Vassilakis"],
       licenses: ["MIT"],
-      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md),
+      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md guides),
       links: %{"GitHub" => @source_url}
     ]
   end

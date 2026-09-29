@@ -73,8 +73,9 @@ Builds ClientSecret or WorkloadIdentity from:
 
 ### DefaultAzureCredential
 
-Chain: Environment → WorkloadIdentity (if env present) → ManagedIdentity.
-Short-circuits on first success.
+Chain: Environment → Managed Identity. Workload identity is reached through
+Environment when `AZURE_FEDERATED_TOKEN_FILE` is set. Continues only on
+`CredentialUnavailable`; other errors halt the chain.
 
 ## TokenCache
 

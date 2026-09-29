@@ -161,7 +161,8 @@ end
 
 ## DefaultAzureCredential
 
-Builds a chain: Environment → Workload Identity (when configured) → Managed Identity.
+Builds a chain: Environment → Managed Identity. Environment already covers
+client-secret and workload-identity when the matching env vars are set.
 
 On a typical laptop with no Azure env vars and no IMDS endpoint, `get_token/2`
 returns `CredentialUnavailable` after a short managed-identity probe.
