@@ -4,7 +4,7 @@ Deliverables and release process for AzureSDK v0.2.0 Identity + Core Contracts.
 
 ## Scope
 
-### Identity ✓
+### Identity (done)
 
 - Fallible `Credential.authorize_request/2`
 - `TokenCredential`, `AccessToken`, `Pipeline.Bearer`
@@ -12,19 +12,19 @@ Deliverables and release process for AzureSDK v0.2.0 Identity + Core Contracts.
 - Supervised `TokenCache` (coalesce, expiry buffer, failure isolation)
 - Secret redaction via `Inspect`
 
-### Core ✓
+### Core (done)
 
 - Retry: jitter, Retry-After / x-ms-retry-after-ms, idempotent transport, 401 refresh-once
 - `AzureSDK.Application` starts TokenCache
 - `Storage.ServiceVersion`
 
-### Documentation ✓
+### Documentation (done)
 
 - CHANGELOG, README roadmap, `guides/azure_identity.md`
 - Livebooks (authentication, blob, streaming, telemetry, getting started)
 - Hex package includes `guides/` for docs extras
 
-### Quality ✓
+### Quality (done)
 
 - Unit + doctests, Azurite integration, Credo, Doctor, Dialyzer, Sobelow
 - CI matrix Elixir 1.17–1.20 / OTP 27–29; Coveralls on 1.20/OTP 28

@@ -4,11 +4,16 @@ defmodule AzureSDK.Storage.Blob.Block do
 
   Used by `AzureSDK.Storage.Blob.upload_stream/5` for bounded-memory uploads.
 
+  Uncommitted blocks are keyed by blob and block ID, so two uploads to the same
+  blob must not share IDs. Generate a fresh `upload_prefix/0` per upload and
+  pass it to `block_id/3`.
+
   ## Examples
 
+      prefix = AzureSDK.Storage.Blob.Block.upload_prefix()
       ids = [
-        AzureSDK.Storage.Blob.Block.block_id(0),
-        AzureSDK.Storage.Blob.Block.block_id(1)
+        AzureSDK.Storage.Blob.Block.block_id(0, 6, prefix),
+        AzureSDK.Storage.Blob.Block.block_id(1, 6, prefix)
       ]
 
       {:ok, :staged} =
@@ -21,8 +26,8 @@ defmodule AzureSDK.Storage.Blob.Block do
         )
   """
 
-  alias AzureSDK.Core.{Pipeline, Request, Telemetry}
-  alias AzureSDK.Storage.{Client, Conditions, Path}
+  alias AzureSDK.Core.Telemetry
+  alias AzureSDK.Storage.{Client, Conditions, Metadata, Operation}
 
   @doc """
   Stages a single uncommitted block.
@@ -38,13 +43,10 @@ defmodule AzureSDK.Storage.Blob.Block do
 
   ## Options
 
-  * condition / lease opts from `AzureSDK.Storage.Conditions` (`:if_match`,
-    `:if_none_match`, `:if_modified_since`, `:if_unmodified_since`, `:lease_id`)
+  * `:lease_id` - required when the blob has an active lease
 
-  ## Returns
-
-  * `{:ok, :staged}`
-  * `{:error, %AzureSDK.Error{}}`
+  Put Block does not support `If-*` conditions; pass them to `put_block_list/5`,
+  which commits the blob. Other options are ignored here.
 
   ## Examples
 
@@ -53,7 +55,7 @@ defmodule AzureSDK.Storage.Blob.Block do
           client,
           "uploads",
           "file.bin",
-          AzureSDK.Storage.Blob.Block.block_id(0),
+          AzureSDK.Storage.Blob.Block.block_id(0, 6, prefix),
           <<1, 2, 3>>,
           lease_id: lease_id
         )
@@ -65,25 +67,20 @@ defmodule AzureSDK.Storage.Blob.Block do
     Telemetry.emit_operation(:blob, :put_block, %{container: container, name: name})
 
     headers =
-      %{
-        "x-ms-version" => client.api_version,
-        "Content-Length" => Integer.to_string(byte_size(content))
-      }
-      |> Map.merge(Conditions.headers(opts))
+      opts
+      |> Keyword.take([:lease_id])
+      |> Conditions.headers()
+      |> Map.put("Content-Length", Integer.to_string(byte_size(content)))
 
-    request =
-      Request.new(
-        method: :put,
-        path: blob_path(container, name),
-        query: [{"comp", "block"}, {"blockid", block_id}],
-        headers: headers,
-        body: content,
-        service: :blob,
-        operation: :put_block,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, _} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, _} <-
+           Operation.run(client,
+             method: :put,
+             path: Operation.blob_path(container, name),
+             query: [{"comp", "block"}, {"blockid", block_id}],
+             headers: headers,
+             body: content,
+             operation: :put_block
+           ) do
       {:ok, :staged}
     end
   end
@@ -105,10 +102,7 @@ defmodule AzureSDK.Storage.Blob.Block do
   * `:metadata` - string-keyed user metadata (replaces existing metadata)
   * condition / lease opts from `AzureSDK.Storage.Conditions`
 
-  ## Returns
-
-  * `{:ok, %{etag: etag | nil, last_modified: last_modified | nil}}`
-  * `{:error, %AzureSDK.Error{}}`
+  Returns the committed blob's `etag` and `last_modified` (either may be `nil`).
 
   ## Examples
 
@@ -120,7 +114,8 @@ defmodule AzureSDK.Storage.Blob.Block do
         )
   """
   @spec put_block_list(Client.t(), String.t(), String.t(), [String.t()], keyword()) ::
-          {:ok, map()} | {:error, AzureSDK.Error.t()}
+          {:ok, %{etag: String.t() | nil, last_modified: String.t() | nil}}
+          | {:error, AzureSDK.Error.t()}
   def put_block_list(client, container, name, block_ids, opts \\ []) when is_list(block_ids) do
     Telemetry.emit_operation(:blob, :put_block_list, %{
       container: container,
@@ -132,44 +127,60 @@ defmodule AzureSDK.Storage.Blob.Block do
 
     headers =
       %{
-        "x-ms-version" => client.api_version,
         "Content-Type" => "application/xml",
         "Content-Length" => Integer.to_string(byte_size(body))
       }
-      |> Map.merge(content_type_header(opts))
+      |> Operation.put_present("x-ms-blob-content-type", Keyword.get(opts, :content_type))
       |> Map.merge(Conditions.headers(opts))
-      |> Map.merge(AzureSDK.Storage.Metadata.headers(Keyword.get(opts, :metadata, %{})))
+      |> Map.merge(Metadata.headers(Keyword.get(opts, :metadata, %{})))
 
-    request =
-      Request.new(
-        method: :put,
-        path: blob_path(container, name),
-        query: [{"comp", "blocklist"}],
-        headers: headers,
-        body: body,
-        service: :blob,
-        operation: :put_block_list,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, response} <-
+           Operation.run(client,
+             method: :put,
+             path: Operation.blob_path(container, name),
+             query: [{"comp", "blocklist"}],
+             headers: headers,
+             body: body,
+             operation: :put_block_list
+           ) do
       {:ok,
        %{
-         etag: header(response, "etag"),
-         last_modified: header(response, "last-modified")
+         etag: Operation.header(response, "etag"),
+         last_modified: Operation.header(response, "last-modified")
        }}
     end
   end
 
   @doc """
-  Encodes a zero-padded block index as a Base64 block ID.
+  Returns a random prefix for the block IDs of one upload.
 
-  All IDs for a blob must use the same decoded width (`width` digits).
+  Every call returns a different 16-character hex string, so concurrent
+  uploads to the same blob never share block IDs.
+
+  ## Examples
+
+      iex> prefix = AzureSDK.Storage.Blob.Block.upload_prefix()
+      iex> byte_size(prefix)
+      16
+      iex> prefix == AzureSDK.Storage.Blob.Block.upload_prefix()
+      false
+  """
+  @spec upload_prefix() :: String.t()
+  def upload_prefix do
+    8 |> :crypto.strong_rand_bytes() |> Base.encode16(case: :lower)
+  end
+
+  @doc """
+  Encodes `prefix` plus a zero-padded block index as a Base64 block ID.
+
+  All IDs for a blob must have the same decoded length, so use one `prefix`
+  and one `width` for every block of an upload.
 
   ## Parameters
 
   * `index` - zero-based block index
-  * `width` - digit width before Base64 (default `6`)
+  * `width` - digit width of the padded index (default `6`)
+  * `prefix` - per-upload prefix from `upload_prefix/0` (default `""`)
 
   ## Examples
 
@@ -179,13 +190,14 @@ defmodule AzureSDK.Storage.Blob.Block do
       "MDAwMDEy"
       iex> AzureSDK.Storage.Blob.Block.block_id(1, 4)
       "MDAwMQ=="
+      iex> AzureSDK.Storage.Blob.Block.block_id(1, 6, "ab") |> Base.decode64!()
+      "ab000001"
   """
-  @spec block_id(non_neg_integer(), pos_integer()) :: String.t()
-  def block_id(index, width \\ 6) when is_integer(index) and index >= 0 do
-    index
-    |> Integer.to_string()
-    |> String.pad_leading(width, "0")
-    |> Base.encode64()
+  @spec block_id(non_neg_integer(), pos_integer(), String.t()) :: String.t()
+  def block_id(index, width \\ 6, prefix \\ "")
+      when is_integer(index) and index >= 0 and is_binary(prefix) do
+    padded = index |> Integer.to_string() |> String.pad_leading(width, "0")
+    Base.encode64(prefix <> padded)
   end
 
   @doc """
@@ -205,26 +217,7 @@ defmodule AzureSDK.Storage.Blob.Block do
   """
   @spec block_list_xml([String.t()]) :: binary()
   def block_list_xml(block_ids) when is_list(block_ids) do
-    entries =
-      Enum.map_join(block_ids, "", fn id ->
-        "<Latest>#{id}</Latest>"
-      end)
-
+    entries = Enum.map_join(block_ids, "", &"<Latest>#{&1}</Latest>")
     "<?xml version=\"1.0\" encoding=\"utf-8\"?><BlockList>#{entries}</BlockList>"
-  end
-
-  defp blob_path(container, name) do
-    Path.join([container | String.split(name, "/", parts: :infinity)])
-  end
-
-  defp content_type_header(opts) do
-    case Keyword.get(opts, :content_type) do
-      nil -> %{}
-      type -> %{"x-ms-blob-content-type" => type}
-    end
-  end
-
-  defp header(%{headers: headers}, name) do
-    Map.get(headers, name) || Map.get(headers, String.downcase(name))
   end
 end

@@ -52,6 +52,19 @@ The Azurite key is public - local use only.
 SASCredential.new("sv=2024-11-04&ss=b&sp=r&se=...")
 ```
 
+Generate one from a Shared Key with `AzureSDK.Storage.Sas` (v0.3.0), for
+example to hand a client read access to a single blob:
+
+```elixir
+{:ok, query} =
+  AzureSDK.Storage.Sas.sign_blob(shared_key,
+    container: "uploads",
+    blob: "report.pdf",
+    permissions: "r",
+    expiry: DateTime.add(DateTime.utc_now(), 3600, :second)
+  )
+```
+
 **Microsoft Entra ID (v0.2.0)** - OAuth bearer tokens, no shared keys. See `guides/azure_identity.md`.
 
 ## Error Handling
@@ -83,7 +96,6 @@ end, nil)
 ## What It Isn't (Yet)
 
 - Full Azure SDK - Queue, Table, Management in later releases
-- SAS generator - AzureSDK consumes SAS tokens but does not create them yet
 - Terraform replacement - use Management plane (v0.6.0) for provisioning
 
 ## Next Steps

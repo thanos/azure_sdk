@@ -4,7 +4,8 @@ defmodule AzureSDK.Storage.Blob do
 
   `upload/5` uses a single Put Blob. `upload_stream/5` stages blocks with Put
   Block / Put Block List so only one chunk is held in memory at a time.
-  `download_stream/4` fetches the blob with HTTP Range requests.
+  `download_stream/4` fetches the blob with HTTP Range requests, pinned to the
+  ETag the blob had when the stream started.
 
   ## Blob map (`t:blob/0`)
 
@@ -23,9 +24,9 @@ defmodule AzureSDK.Storage.Blob do
 
   ## Errors
 
-  Failures return `{:error, %AzureSDK.Error{}}`. Mid-stream range failures in
-  `download_stream/4` raise `AzureSDK.Storage.Blob.StreamError`. Functions do
-  not raise for ordinary Azure HTTP failures on non-stream APIs.
+  Failures return `{:error, %AzureSDK.Error{}}`. The one exception is
+  enumerating the stream from `download_stream/4`: a failed range raises
+  `AzureSDK.Storage.Blob.StreamError`.
 
   ## Condition and lease options
 
@@ -34,11 +35,14 @@ defmodule AzureSDK.Storage.Blob do
   `:lease_id`.
   """
 
-  alias AzureSDK.Core.{Pipeline, Request, Response, Telemetry}
+  alias AzureSDK.Core.{Response, Telemetry}
+  alias AzureSDK.Error
   alias AzureSDK.Storage.Blob.Block
-  alias AzureSDK.Storage.{Client, Conditions, Metadata, Path}
+  alias AzureSDK.Storage.{Client, Conditions, Metadata, Operation}
 
   @default_chunk_size 4 * 1024 * 1024
+  @default_content_type "application/octet-stream"
+  @max_blocks 50_000
 
   @typedoc """
   Blob result map.
@@ -95,20 +99,15 @@ defmodule AzureSDK.Storage.Blob do
     Telemetry.emit_operation(:blob, :put, %{container: container, name: name})
 
     content = IO.iodata_to_binary(content)
-    headers = upload_headers(client, opts, byte_size(content))
 
-    request =
-      Request.new(
-        method: :put,
-        path: blob_path(container, name),
-        headers: headers,
-        body: content,
-        service: :blob,
-        operation: :put,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, response} <-
+           Operation.run(client,
+             method: :put,
+             path: Operation.blob_path(container, name),
+             headers: upload_headers(opts, byte_size(content)),
+             body: content,
+             operation: :put
+           ) do
       {:ok, blob_from_response(container, name, response, content, opts)}
     end
   end
@@ -116,8 +115,10 @@ defmodule AzureSDK.Storage.Blob do
   @doc """
   Uploads a blob from an enumerable using Put Block / Put Block List.
 
-  Only one `:block_size` chunk is buffered at a time. An empty enumerable falls
-  back to `upload/5` with an empty body. Returned `:content` is always `nil`.
+  Only one `:block_size` chunk is buffered at a time. Each call stages blocks
+  under a fresh random block-ID prefix, so concurrent uploads to the same blob
+  cannot mix blocks; the last commit wins. An empty enumerable falls back to
+  `upload/5` with an empty body. Returned `:content` is always `nil`.
 
   ## Parameters
 
@@ -128,11 +129,17 @@ defmodule AzureSDK.Storage.Blob do
   ## Options
 
   * `:block_size` - max bytes per staged block (default 4 MiB)
-  * `:content_type` - blob content type on commit
+  * `:content_type` - blob content type on commit (default `"application/octet-stream"`)
   * `:metadata` - string-keyed user metadata
-  * condition / lease opts from `AzureSDK.Storage.Conditions`
+  * condition / lease opts from `AzureSDK.Storage.Conditions`. `If-*` conditions
+    apply to the final commit; `:lease_id` is sent with every request.
+
+  A blob has at most 50,000 blocks. When the stream would need more, the upload
+  stops with `{:error, %AzureSDK.Error{code: "BlockCountExceeded"}}` before the
+  extra block is sent; raise `:block_size` for larger uploads.
 
   On mid-stream failure, staged uncommitted blocks may remain on the service.
+  Azure discards them after a week.
 
   ## Examples
 
@@ -167,7 +174,7 @@ defmodule AzureSDK.Storage.Blob do
              container: container,
              name: name,
              properties: %{
-               content_type: Keyword.get(opts, :content_type),
+               content_type: Keyword.get(opts, :content_type, @default_content_type),
                content_length: total_size,
                etag: props.etag,
                last_modified: props.last_modified
@@ -218,22 +225,17 @@ defmodule AzureSDK.Storage.Blob do
     Telemetry.emit_operation(:blob, :get, %{container: container, name: name})
 
     headers =
-      client
-      |> base_headers()
-      |> Map.merge(Conditions.headers(opts))
+      opts
+      |> Conditions.headers()
       |> Map.merge(range_header(Keyword.get(opts, :range)))
 
-    request =
-      Request.new(
-        method: :get,
-        path: blob_path(container, name),
-        headers: headers,
-        service: :blob,
-        operation: :get,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, response} <-
+           Operation.run(client,
+             method: :get,
+             path: Operation.blob_path(container, name),
+             headers: headers,
+             operation: :get
+           ) do
       {:ok, blob_from_response(container, name, response, response.body, opts)}
     end
   end
@@ -249,9 +251,17 @@ defmodule AzureSDK.Storage.Blob do
   ## Options
 
   * `:chunk_size` - bytes per range request (default 4 MiB)
-  * condition / lease opts from `AzureSDK.Storage.Conditions` (applied to each range GET)
+  * condition / lease opts from `AzureSDK.Storage.Conditions` (applied to the
+    initial HEAD and to each range GET)
 
-  Mid-stream HTTP failures raise `AzureSDK.Storage.Blob.StreamError`.
+  The stream reads the blob's size and ETag once, then sends `If-Match` with
+  that ETag on every range (unless you pass `:if_match` yourself). If the blob
+  is overwritten while you enumerate, the next range fails with 412 instead of
+  returning bytes from the new version. The `:range` and `:include_content`
+  options of `download/4` are ignored here.
+
+  Mid-stream HTTP failures, including that 412, raise
+  `AzureSDK.Storage.Blob.StreamError`.
 
   ## Examples
 
@@ -267,13 +277,15 @@ defmodule AzureSDK.Storage.Blob do
           {:ok, Enumerable.t()} | {:error, AzureSDK.Error.t()}
   def download_stream(client, container, name, opts \\ []) do
     chunk_size = Keyword.get(opts, :chunk_size, @default_chunk_size)
+    opts = Keyword.drop(opts, [:range, :include_content])
 
-    case blob_size(client, container, name, opts) do
-      {:ok, 0} ->
+    case blob_properties(client, container, name, opts) do
+      {:ok, 0, _etag} ->
         {:ok, []}
 
-      {:ok, size} ->
-        {:ok, range_stream(client, container, name, opts, chunk_size, size)}
+      {:ok, size, etag} ->
+        range_opts = if etag, do: Keyword.put_new(opts, :if_match, etag), else: opts
+        {:ok, range_stream(client, container, name, range_opts, chunk_size, size)}
 
       {:error, _} = error ->
         error
@@ -283,26 +295,20 @@ defmodule AzureSDK.Storage.Blob do
   defp range_stream(client, container, name, opts, chunk_size, size) do
     Stream.resource(
       fn -> 0 end,
-      fn offset -> next_range_chunk(client, container, name, opts, chunk_size, size, offset) end,
+      fn
+        offset when offset >= size ->
+          {:halt, offset}
+
+        offset ->
+          finish = min(offset + chunk_size - 1, size - 1)
+
+          case download(client, container, name, Keyword.put(opts, :range, {offset, finish})) do
+            {:ok, %{content: content}} -> {[content], finish + 1}
+            {:error, reason} -> raise AzureSDK.Storage.Blob.StreamError, reason: reason
+          end
+      end,
       fn _ -> :ok end
     )
-  end
-
-  defp next_range_chunk(_client, _container, _name, _opts, _chunk_size, size, offset)
-       when offset >= size do
-    {:halt, offset}
-  end
-
-  defp next_range_chunk(client, container, name, opts, chunk_size, size, offset) do
-    finish = min(offset + chunk_size - 1, size - 1)
-
-    case download(client, container, name, Keyword.put(opts, :range, {offset, finish})) do
-      {:ok, %{content: content}} when is_binary(content) ->
-        {[content], finish + 1}
-
-      {:error, reason} ->
-        raise AzureSDK.Storage.Blob.StreamError, reason: reason
-    end
   end
 
   @doc """
@@ -332,22 +338,13 @@ defmodule AzureSDK.Storage.Blob do
   def delete(client, container, name, opts \\ []) do
     Telemetry.emit_operation(:blob, :delete, %{container: container, name: name})
 
-    headers =
-      client
-      |> base_headers()
-      |> Map.merge(Conditions.headers(opts))
-
-    request =
-      Request.new(
-        method: :delete,
-        path: blob_path(container, name),
-        headers: headers,
-        service: :blob,
-        operation: :delete,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, _} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, _} <-
+           Operation.run(client,
+             method: :delete,
+             path: Operation.blob_path(container, name),
+             headers: Conditions.headers(opts),
+             operation: :delete
+           ) do
       {:ok, :deleted}
     end
   end
@@ -377,22 +374,13 @@ defmodule AzureSDK.Storage.Blob do
   def metadata(client, container, name, opts \\ []) do
     Telemetry.emit_operation(:blob, :metadata, %{container: container, name: name})
 
-    headers =
-      client
-      |> base_headers()
-      |> Map.merge(Conditions.headers(opts))
-
-    request =
-      Request.new(
-        method: :head,
-        path: blob_path(container, name),
-        headers: headers,
-        service: :blob,
-        operation: :metadata,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, response} <-
+           Operation.run(client,
+             method: :head,
+             path: Operation.blob_path(container, name),
+             headers: Conditions.headers(opts),
+             operation: :metadata
+           ) do
       {:ok, Metadata.from_headers(response.headers)}
     end
   end
@@ -426,41 +414,39 @@ defmodule AzureSDK.Storage.Blob do
   def set_metadata(client, container, name, metadata, opts \\ []) do
     Telemetry.emit_operation(:blob, :set_metadata, %{container: container, name: name})
 
-    headers =
-      client
-      |> base_headers()
-      |> Map.merge(Metadata.headers(metadata))
-      |> Map.merge(Conditions.headers(opts))
+    headers = Map.merge(Metadata.headers(metadata), Conditions.headers(opts))
 
-    request =
-      Request.new(
-        method: :put,
-        path: blob_path(container, name),
-        query: [{"comp", "metadata"}],
-        headers: headers,
-        service: :blob,
-        operation: :set_metadata,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, _} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, _} <-
+           Operation.run(client,
+             method: :put,
+             path: Operation.blob_path(container, name),
+             query: [{"comp", "metadata"}],
+             headers: headers,
+             operation: :set_metadata
+           ) do
       {:ok, metadata}
     end
   end
 
   defp stage_blocks(client, container, name, stream, block_size, opts) do
+    prefix = Block.upload_prefix()
+
     stream
-    |> chunk_iodata(block_size)
-    |> Enum.reduce_while({:ok, [], 0, 0}, fn chunk, {:ok, ids, index, total} ->
-      block_id = Block.block_id(index)
+    |> chunk_stream(block_size)
+    |> Enum.reduce_while({:ok, [], 0, 0}, fn
+      _chunk, {:ok, _ids, @max_blocks, _total} ->
+        {:halt, {:error, block_count_exceeded(block_size)}}
 
-      case Block.put_block(client, container, name, block_id, chunk, opts) do
-        {:ok, :staged} ->
-          {:cont, {:ok, [block_id | ids], index + 1, total + byte_size(chunk)}}
+      chunk, {:ok, ids, index, total} ->
+        block_id = Block.block_id(index, 6, prefix)
 
-        {:error, _} = error ->
-          {:halt, error}
-      end
+        case Block.put_block(client, container, name, block_id, chunk, opts) do
+          {:ok, :staged} ->
+            {:cont, {:ok, [block_id | ids], index + 1, total + byte_size(chunk)}}
+
+          {:error, _} = error ->
+            {:halt, error}
+        end
     end)
     |> case do
       {:ok, ids, _index, total} -> {:ok, Enum.reverse(ids), total}
@@ -468,54 +454,60 @@ defmodule AzureSDK.Storage.Blob do
     end
   end
 
-  defp chunk_iodata(stream, block_size) do
+  defp block_count_exceeded(block_size) do
+    Error.new(
+      code: "BlockCountExceeded",
+      message:
+        "Upload needs more than #{@max_blocks} blocks of #{block_size} bytes; increase :block_size",
+      service: :blob
+    )
+  end
+
+  @doc false
+  # Regroups an enumerable of iodata into binaries of exactly `block_size` bytes
+  # (the last one may be shorter). Pieces are buffered as iodata and only
+  # flattened once a full block is available, so cost stays linear in the input.
+  @spec chunk_stream(Enumerable.t(), pos_integer()) :: Enumerable.t()
+  def chunk_stream(stream, block_size) when is_integer(block_size) and block_size > 0 do
     stream
     |> Stream.concat([:__done__])
-    |> Stream.transform(<<>>, fn
-      :__done__, <<>> ->
-        {:halt, <<>>}
+    |> Stream.transform({[], 0}, fn
+      :__done__, {_buffer, 0} ->
+        {[], {[], 0}}
 
-      :__done__, acc ->
-        {[acc], <<>>}
+      :__done__, {buffer, _size} ->
+        {[buffer |> Enum.reverse() |> IO.iodata_to_binary()], {[], 0}}
 
-      piece, acc ->
-        data = IO.iodata_to_binary([acc, piece])
-        flush_full_chunks(data, block_size)
+      piece, {buffer, size} ->
+        piece_size = IO.iodata_length(piece)
+        buffer = [piece | buffer]
+        size = size + piece_size
+
+        if size >= block_size do
+          data = buffer |> Enum.reverse() |> IO.iodata_to_binary()
+          {blocks, rest} = split_blocks(data, block_size, [])
+          {blocks, {[rest], byte_size(rest)}}
+        else
+          {[], {buffer, size}}
+        end
     end)
   end
 
-  defp flush_full_chunks(data, block_size) do
-    do_flush(data, block_size, [])
+  defp split_blocks(data, block_size, acc) when byte_size(data) >= block_size do
+    <<block::binary-size(block_size), rest::binary>> = data
+    split_blocks(rest, block_size, [block | acc])
   end
 
-  defp do_flush(data, block_size, acc) when byte_size(data) >= block_size do
-    <<chunk::binary-size(block_size), rest::binary>> = data
-    do_flush(rest, block_size, [chunk | acc])
-  end
+  defp split_blocks(rest, _block_size, acc), do: {Enum.reverse(acc), rest}
 
-  defp do_flush(data, _block_size, acc) do
-    {Enum.reverse(acc), data}
-  end
-
-  defp blob_path(container, name) do
-    Path.join([container | String.split(name, "/", parts: :infinity)])
-  end
-
-  defp upload_headers(client, opts, size) do
-    content_type = Keyword.get(opts, :content_type, "application/octet-stream")
-
+  defp upload_headers(opts, size) do
     %{
-      "x-ms-version" => client.api_version,
-      "Content-Type" => content_type,
+      "Content-Type" => Keyword.get(opts, :content_type, @default_content_type),
       "Content-Length" => Integer.to_string(size),
       "x-ms-blob-type" => Keyword.get(opts, :blob_type, "BlockBlob")
     }
     |> Map.merge(Metadata.headers(Keyword.get(opts, :metadata, %{})))
     |> Map.merge(Conditions.headers(opts))
-  end
-
-  defp base_headers(client) do
-    %{"x-ms-version" => client.api_version}
   end
 
   defp range_header(nil), do: %{}
@@ -524,82 +516,39 @@ defmodule AzureSDK.Storage.Blob do
     %{"Range" => "bytes=#{start}-#{finish}"}
   end
 
-  defp blob_size(client, container, name, opts) do
-    headers =
-      client
-      |> base_headers()
-      |> Map.merge(Conditions.headers(opts))
-
-    request =
-      Request.new(
-        method: :head,
-        path: blob_path(container, name),
-        headers: headers,
-        service: :blob,
-        operation: :blob_size,
-        metadata: Client.signing_metadata(client)
-      )
-
-    case Pipeline.run(Client.to_core_client(client), request) do
-      {:ok, response} ->
-        case parse_size_header(response) do
-          {:ok, _} = ok -> ok
-          :error -> probe_size_via_range(client, container, name, opts)
-        end
-
-      {:error, _} = error ->
-        error
+  defp blob_properties(client, container, name, opts) do
+    with {:ok, response} <-
+           Operation.run(client,
+             method: :head,
+             path: Operation.blob_path(container, name),
+             headers: Conditions.headers(opts),
+             operation: :blob_size
+           ) do
+      case parse_size(response) do
+        {:ok, size} -> {:ok, size, Operation.header(response, "etag")}
+        :error -> {:error, invalid_size(response)}
+      end
     end
   end
 
-  defp parse_size_header(response) do
-    cond do
-      value = response_header(response, "x-ms-blob-content-length") ->
-        {:ok, String.to_integer(to_string(value))}
+  defp parse_size(response) do
+    value =
+      Operation.header(response, "x-ms-blob-content-length") ||
+        Operation.header(response, "content-length")
 
-      value = response_header(response, "content-length") ->
-        {:ok, String.to_integer(to_string(value))}
-
-      true ->
-        :error
+    case value && Integer.parse(value) do
+      {size, ""} when size >= 0 -> {:ok, size}
+      _ -> :error
     end
   end
 
-  defp probe_size_via_range(client, container, name, opts) do
-    headers =
-      client
-      |> base_headers()
-      |> Map.merge(Conditions.headers(opts))
-      |> Map.merge(%{"Range" => "bytes=0-0"})
-
-    request =
-      Request.new(
-        method: :get,
-        path: blob_path(container, name),
-        headers: headers,
-        service: :blob,
-        operation: :blob_size_probe,
-        metadata: Client.signing_metadata(client)
-      )
-
-    case Pipeline.run(Client.to_core_client(client), request) do
-      {:ok, response} -> {:ok, size_from_probe_response(response)}
-      {:error, %{status: 416}} -> {:ok, 0}
-      {:error, _} = error -> error
-    end
-  end
-
-  defp size_from_probe_response(response) do
-    case response_header(response, "content-range") do
-      "bytes " <> rest ->
-        case Regex.run(~r/\/(\d+)\z/, rest) do
-          [_, total] -> String.to_integer(total)
-          _ -> byte_size(response.body || "")
-        end
-
-      _ ->
-        byte_size(response.body || "")
-    end
+  defp invalid_size(response) do
+    Error.new(
+      code: "InvalidResponse",
+      message: "Blob properties response has no valid Content-Length",
+      status: response.status,
+      service: :blob
+    )
   end
 
   defp blob_from_response(container, name, %Response{} = response, content, opts) do
@@ -607,10 +556,10 @@ defmodule AzureSDK.Storage.Blob do
       container: container,
       name: name,
       properties: %{
-        content_type: response_header(response, "content-type"),
+        content_type: Operation.header(response, "content-type"),
         content_length: content_length(response, content),
-        etag: response_header(response, "etag"),
-        last_modified: response_header(response, "last-modified")
+        etag: Operation.header(response, "etag"),
+        last_modified: Operation.header(response, "last-modified")
       },
       metadata: Metadata.from_headers(response.headers),
       content: content_value(content, opts)
@@ -621,12 +570,8 @@ defmodule AzureSDK.Storage.Blob do
     if Keyword.get(opts, :include_content, true), do: content
   end
 
-  defp response_header(%Response{headers: headers}, name) do
-    Map.get(headers, name) || Map.get(headers, String.downcase(name))
-  end
-
   defp content_length(_response, content) when is_binary(content), do: byte_size(content)
-  defp content_length(response, _), do: response_header(response, "content-length")
+  defp content_length(response, _), do: Operation.header(response, "content-length")
 end
 
 defmodule AzureSDK.Storage.Blob.StreamError do

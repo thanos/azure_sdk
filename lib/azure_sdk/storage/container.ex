@@ -19,9 +19,9 @@ defmodule AzureSDK.Storage.Container do
       %{items: [%{name: "a.txt", ...}], marker: "continuation-token"}
   """
 
-  alias AzureSDK.Core.{Pipeline, Request, Telemetry}
+  alias AzureSDK.Core.Telemetry
   alias AzureSDK.Core.Xml.{ListBlobs, ListContainers}
-  alias AzureSDK.Storage.{Client, Metadata, Path}
+  alias AzureSDK.Storage.{Client, Metadata, Operation, Path}
 
   @typedoc """
   Container result map.
@@ -74,23 +74,19 @@ defmodule AzureSDK.Storage.Container do
     Telemetry.emit_operation(:container, :create, %{name: name})
 
     headers =
-      %{"x-ms-version" => client.api_version}
-      |> Map.merge(public_access_header(opts))
+      %{}
+      |> Operation.put_present("x-ms-blob-public-access", Keyword.get(opts, :public_access))
       |> Map.merge(Metadata.headers(Keyword.get(opts, :metadata, %{})))
 
-    request =
-      Request.new(
-        method: :put,
-        path: Path.join([name]),
-        query: [{"restype", "container"}],
-        headers: headers,
-        body: "",
-        service: :blob,
-        operation: :create_container,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, response} <-
+           Operation.run(client,
+             method: :put,
+             path: Path.join([name]),
+             query: [{"restype", "container"}],
+             headers: headers,
+             body: "",
+             operation: :create_container
+           ) do
       {:ok, container_from_response(name, response, opts)}
     end
   end
@@ -113,18 +109,13 @@ defmodule AzureSDK.Storage.Container do
   def delete(client, name, _opts \\ []) do
     Telemetry.emit_operation(:container, :delete, %{name: name})
 
-    request =
-      Request.new(
-        method: :delete,
-        path: Path.join([name]),
-        query: [{"restype", "container"}],
-        headers: %{"x-ms-version" => client.api_version},
-        service: :blob,
-        operation: :delete_container,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, _} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, _} <-
+           Operation.run(client,
+             method: :delete,
+             path: Path.join([name]),
+             query: [{"restype", "container"}],
+             operation: :delete_container
+           ) do
       {:ok, :deleted}
     end
   end
@@ -133,7 +124,8 @@ defmodule AzureSDK.Storage.Container do
   Lists all containers (eager).
 
   Follows continuation markers until complete. Accepts the same options as
-  `list_page/2` (`:prefix`, `:max_results`; `:marker` is managed internally).
+  `list_page/2`. `:max_results` is the page size, not a limit on the total;
+  `:marker` is managed internally.
 
   ## Parameters
 
@@ -150,7 +142,7 @@ defmodule AzureSDK.Storage.Container do
   @spec list(Client.t(), keyword()) :: {:ok, [container()]} | {:error, AzureSDK.Error.t()}
   def list(client, opts \\ []) do
     Telemetry.emit_operation(:container, :list, %{})
-    collect_pages(fn marker -> list_page(client, Keyword.put(opts, :marker, marker)) end)
+    Operation.collect_pages(&list_page(client, Keyword.put(opts, :marker, &1)))
   end
 
   @doc """
@@ -164,7 +156,7 @@ defmodule AzureSDK.Storage.Container do
   ## Options
 
   * `:marker` - continuation token from a previous page
-  * `:max_results` - page size
+  * `:max_results` - page size (the service caps it at 5,000)
   * `:prefix` - name prefix filter
 
   ## Examples
@@ -179,22 +171,13 @@ defmodule AzureSDK.Storage.Container do
   def list_page(client, opts \\ []) do
     Telemetry.emit_operation(:container, :list_page, %{})
 
-    query =
-      [{"comp", "list"}]
-      |> Kernel.++(optional_query(opts))
-
-    request =
-      Request.new(
-        method: :get,
-        path: "/",
-        query: query,
-        headers: %{"x-ms-version" => client.api_version},
-        service: :blob,
-        operation: :list_containers,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, response} <-
+           Operation.run(client,
+             method: :get,
+             path: "/",
+             query: [{"comp", "list"} | optional_query(opts)],
+             operation: :list_containers
+           ) do
       page = ListContainers.parse_page(response.body || "")
       {:ok, %{items: page.items, marker: blank_to_nil(page.marker)}}
     end
@@ -220,39 +203,17 @@ defmodule AzureSDK.Storage.Container do
   """
   @spec list_stream(Client.t(), keyword()) :: Enumerable.t()
   def list_stream(client, opts \\ []) do
-    Stream.resource(
-      fn -> :start end,
-      fn
-        :done ->
-          {:halt, :done}
-
-        marker ->
-          page_opts =
-            case marker do
-              :start -> opts
-              m -> Keyword.put(opts, :marker, m)
-            end
-
-          case list_page(client, page_opts) do
-            {:ok, %{items: items, marker: nil}} ->
-              {items, :done}
-
-            {:ok, %{items: items, marker: next}} ->
-              {items, next}
-
-            {:error, reason} ->
-              raise AzureSDK.Storage.Container.StreamError, reason: reason
-          end
-      end,
-      fn _ -> :ok end
+    Operation.page_stream(
+      &list_page(client, Keyword.put(opts, :marker, &1)),
+      AzureSDK.Storage.Container.StreamError
     )
   end
 
   @doc """
   Lists all blobs in a container (eager).
 
-  Accepts the same options as `list_blobs_page/3` (`:prefix`, `:max_results`;
-  `:marker` is managed internally).
+  Accepts the same options as `list_blobs_page/3`. `:max_results` is the page
+  size, not a limit on the total; `:marker` is managed internally.
 
   ## Parameters
 
@@ -275,9 +236,7 @@ defmodule AzureSDK.Storage.Container do
   def list_blobs(client, container, opts \\ []) do
     Telemetry.emit_operation(:container, :list_blobs, %{container: container})
 
-    collect_pages(fn marker ->
-      list_blobs_page(client, container, Keyword.put(opts, :marker, marker))
-    end)
+    Operation.collect_pages(&list_blobs_page(client, container, Keyword.put(opts, :marker, &1)))
   end
 
   @doc """
@@ -292,7 +251,7 @@ defmodule AzureSDK.Storage.Container do
   ## Options
 
   * `:marker` - continuation token
-  * `:max_results` - page size
+  * `:max_results` - page size (the service caps it at 5,000)
   * `:prefix` - blob name prefix filter
 
   ## Examples
@@ -308,22 +267,13 @@ defmodule AzureSDK.Storage.Container do
   def list_blobs_page(client, container, opts \\ []) do
     Telemetry.emit_operation(:container, :list_blobs_page, %{container: container})
 
-    query =
-      [{"restype", "container"}, {"comp", "list"}]
-      |> Kernel.++(optional_query(opts))
-
-    request =
-      Request.new(
-        method: :get,
-        path: Path.join([container]),
-        query: query,
-        headers: %{"x-ms-version" => client.api_version},
-        service: :blob,
-        operation: :list_blobs,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, response} <-
+           Operation.run(client,
+             method: :get,
+             path: Path.join([container]),
+             query: [{"restype", "container"}, {"comp", "list"} | optional_query(opts)],
+             operation: :list_blobs
+           ) do
       page = ListBlobs.parse_page(response.body || "")
       {:ok, %{items: page.items, marker: blank_to_nil(page.marker)}}
     end
@@ -350,31 +300,9 @@ defmodule AzureSDK.Storage.Container do
   """
   @spec list_blobs_stream(Client.t(), String.t(), keyword()) :: Enumerable.t()
   def list_blobs_stream(client, container, opts \\ []) do
-    Stream.resource(
-      fn -> :start end,
-      fn
-        :done ->
-          {:halt, :done}
-
-        marker ->
-          page_opts =
-            case marker do
-              :start -> opts
-              m -> Keyword.put(opts, :marker, m)
-            end
-
-          case list_blobs_page(client, container, page_opts) do
-            {:ok, %{items: items, marker: nil}} ->
-              {items, :done}
-
-            {:ok, %{items: items, marker: next}} ->
-              {items, next}
-
-            {:error, reason} ->
-              raise AzureSDK.Storage.Container.StreamError, reason: reason
-          end
-      end,
-      fn _ -> :ok end
+    Operation.page_stream(
+      &list_blobs_page(client, container, Keyword.put(opts, :marker, &1)),
+      AzureSDK.Storage.Container.StreamError
     )
   end
 
@@ -433,36 +361,13 @@ defmodule AzureSDK.Storage.Container do
     end
   end
 
-  defp collect_pages(fetch_page) do
-    do_collect(fetch_page, nil, [])
-  end
-
-  defp do_collect(fetch_page, marker, acc) do
-    case fetch_page.(marker) do
-      {:ok, %{items: items, marker: nil}} ->
-        {:ok, acc ++ items}
-
-      {:ok, %{items: items, marker: next}} ->
-        do_collect(fetch_page, next, acc ++ items)
-
-      {:error, _} = error ->
-        error
-    end
-  end
-
   defp head_container(client, name, operation) do
-    request =
-      Request.new(
-        method: :head,
-        path: Path.join([name]),
-        query: [{"restype", "container"}],
-        headers: %{"x-ms-version" => client.api_version},
-        service: :blob,
-        operation: operation,
-        metadata: Client.signing_metadata(client)
-      )
-
-    Pipeline.run(Client.to_core_client(client), request)
+    Operation.run(client,
+      method: :head,
+      path: Path.join([name]),
+      query: [{"restype", "container"}],
+      operation: operation
+    )
   end
 
   defp optional_query(opts) do
@@ -479,13 +384,6 @@ defmodule AzureSDK.Storage.Container do
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
-
-  defp public_access_header(opts) do
-    case Keyword.get(opts, :public_access) do
-      nil -> %{}
-      level -> %{"x-ms-blob-public-access" => to_string(level)}
-    end
-  end
 
   defp container_from_response(name, response, opts) do
     %{

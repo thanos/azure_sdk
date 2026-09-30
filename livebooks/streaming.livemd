@@ -2,7 +2,8 @@
 
 ```elixir
 Mix.install([
-  {:azure_sdk, path: Path.expand("..", __DIR__)}
+  # {:azure_sdk, path: Path.expand("..", __DIR__)},
+  {:azure_sdk, "~> 0.3.0"}
 ])
 ```
 

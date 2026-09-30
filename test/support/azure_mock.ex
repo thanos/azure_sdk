@@ -126,15 +126,29 @@ defmodule AzureSDK.AzureMock do
     |> Plug.Conn.resp(status, "")
   end
 
+  @doc """
+  Stubs Put Block / Put Block List and records what the client sent.
+
+  Returns an Agent holding `%{blocks: %{id => body}, block_headers: [headers],
+  commits: [%{ids: [id], headers: headers}]}`. Use `committed_content/1` to
+  reassemble the committed blob.
+  """
   def stub_put_blob_blocks(bypass, container, blob) do
+    {:ok, recorder} = Agent.start_link(fn -> %{blocks: %{}, block_headers: [], commits: []} end)
+
     Bypass.expect(bypass, "PUT", path([container, blob]), fn conn ->
       conn = Plug.Conn.fetch_query_params(conn)
+      {:ok, body, conn} = Plug.Conn.read_body(conn, length: 64 * 1024 * 1024)
+      headers = Map.new(conn.req_headers)
 
       case conn.query_params do
-        %{"comp" => "block"} ->
+        %{"comp" => "block", "blockid" => id} ->
+          Agent.update(recorder, &record_block(&1, id, body, headers))
           Plug.Conn.resp(conn, 201, "")
 
         %{"comp" => "blocklist"} ->
+          Agent.update(recorder, &record_commit(&1, body, headers))
+
           conn
           |> Plug.Conn.put_resp_header("etag", "\"0xblock\"")
           |> Plug.Conn.put_resp_header("last-modified", "Wed, 01 Jan 2025 00:00:00 GMT")
@@ -144,6 +158,32 @@ defmodule AzureSDK.AzureMock do
           Plug.Conn.resp(conn, 400, "unexpected")
       end
     end)
+
+    recorder
+  end
+
+  defp record_block(state, id, body, headers) do
+    %{
+      state
+      | blocks: Map.put(state.blocks, id, body),
+        block_headers: [headers | state.block_headers]
+    }
+  end
+
+  defp record_commit(state, body, headers) do
+    ids =
+      ~r{<Latest>([^<]+)</Latest>} |> Regex.scan(body, capture: :all_but_first) |> List.flatten()
+
+    %{state | commits: state.commits ++ [%{ids: ids, headers: headers}]}
+  end
+
+  @doc """
+  Reassembles the last committed blob from a `stub_put_blob_blocks/3` recorder.
+  """
+  def committed_content(recorder) do
+    %{blocks: blocks, commits: commits} = Agent.get(recorder, & &1)
+    %{ids: ids} = List.last(commits)
+    Enum.map_join(ids, &Map.fetch!(blocks, &1))
   end
 
   def stub_head_blob_size(bypass, container, blob, size) do

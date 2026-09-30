@@ -90,4 +90,68 @@ defmodule AzureSDK.Storage.Blob.LeaseTest do
     assert {:error, %{status: 409, code: "LeaseAlreadyPresent"}} =
              Lease.acquire(client, "uploads", "a.txt")
   end
+
+  describe "retries" do
+    @retry %{max_attempts: 3, base_delay_ms: 1, max_delay_ms: 1, jitter: false}
+
+    # Fails the first request with a transport error, then answers 201, and
+    # reports each request's lease headers to the test process.
+    defp flaky_client(test_pid) do
+      {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+      plug = fn conn ->
+        send(test_pid, {:lease_request, Map.new(conn.req_headers)})
+
+        case Agent.get_and_update(calls, &{&1, &1 + 1}) do
+          0 -> Req.Test.transport_error(conn, :closed)
+          _ -> Plug.Conn.resp(conn, 201, "")
+        end
+      end
+
+      AzureSDK.Storage.Client.new(
+        account: AzureMock.account(),
+        credential: AzureMock.credential(),
+        endpoint: "http://localhost/#{AzureMock.account()}",
+        retry: @retry,
+        req_options: [plug: plug]
+      )
+    end
+
+    test "acquire generates a proposed lease id and a retry reuses it" do
+      client = flaky_client(self())
+
+      assert {:ok, lease_id} = Lease.acquire(client, "uploads", "a.txt")
+
+      assert lease_id =~
+               ~r/\A[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/
+
+      assert_received {:lease_request, %{"x-ms-proposed-lease-id" => ^lease_id}}
+      assert_received {:lease_request, %{"x-ms-proposed-lease-id" => ^lease_id}}
+    end
+
+    test "change is not retried" do
+      client = flaky_client(self())
+
+      assert {:error, %AzureSDK.Error{}} =
+               Lease.change(client, "uploads", "a.txt", lease_id: "old", proposed_lease_id: "new")
+
+      assert_received {:lease_request, %{"x-ms-lease-action" => "change"}}
+      refute_received {:lease_request, _}
+    end
+  end
+
+  describe "missing options" do
+    test "return InvalidArgument instead of raising", %{client: client} do
+      assert {:error, %AzureSDK.Error{code: "InvalidArgument"}} =
+               Lease.renew(client, "uploads", "a.txt")
+
+      assert {:error, %AzureSDK.Error{code: "InvalidArgument"}} =
+               Lease.release(client, "uploads", "a.txt", [])
+
+      assert {:error, %AzureSDK.Error{code: "InvalidArgument", message: message}} =
+               Lease.change(client, "uploads", "a.txt", lease_id: "old")
+
+      assert message =~ ":proposed_lease_id"
+    end
+  end
 end

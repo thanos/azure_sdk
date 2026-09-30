@@ -6,8 +6,8 @@ defmodule AzureSDK.Storage.Conditions do
 
   * `:if_match` - `If-Match` (ETag or `"*"`)
   * `:if_none_match` - `If-None-Match`
-  * `:if_modified_since` - `If-Modified-Since` (HTTP-date string)
-  * `:if_unmodified_since` - `If-Unmodified-Since`
+  * `:if_modified_since` - `If-Modified-Since` (`DateTime` or HTTP-date string)
+  * `:if_unmodified_since` - `If-Unmodified-Since` (`DateTime` or HTTP-date string)
   * `:lease_id` - `x-ms-lease-id`
 
   Unknown keys are ignored. Pass the same keyword list into Blob / Lease
@@ -18,6 +18,8 @@ defmodule AzureSDK.Storage.Conditions do
       iex> AzureSDK.Storage.Conditions.headers(if_match: "\\"0x1\\"", lease_id: "abc")
       %{"If-Match" => "\\"0x1\\"", "x-ms-lease-id" => "abc"}
   """
+
+  alias AzureSDK.Storage.Operation
 
   @doc """
   Returns a header map for the given options. Unknown keys are ignored.
@@ -39,19 +41,22 @@ defmodule AzureSDK.Storage.Conditions do
         "If-Unmodified-Since" => "Thu, 01 Jan 2030 00:00:00 GMT"
       }
 
+      iex> AzureSDK.Storage.Conditions.headers(if_modified_since: ~U[2020-01-01 00:00:00Z])
+      %{"If-Modified-Since" => "Wed, 01 Jan 2020 00:00:00 GMT"}
+
       iex> AzureSDK.Storage.Conditions.headers(if_match: "\\"etag\\"", unknown: :ignored)
       %{"If-Match" => "\\"etag\\""}
   """
   @spec headers(keyword()) :: %{String.t() => String.t()}
   def headers(opts) when is_list(opts) do
     %{}
-    |> maybe_put("If-Match", Keyword.get(opts, :if_match))
-    |> maybe_put("If-None-Match", Keyword.get(opts, :if_none_match))
-    |> maybe_put("If-Modified-Since", Keyword.get(opts, :if_modified_since))
-    |> maybe_put("If-Unmodified-Since", Keyword.get(opts, :if_unmodified_since))
-    |> maybe_put("x-ms-lease-id", Keyword.get(opts, :lease_id))
+    |> Operation.put_present("If-Match", Keyword.get(opts, :if_match))
+    |> Operation.put_present("If-None-Match", Keyword.get(opts, :if_none_match))
+    |> Operation.put_present("If-Modified-Since", date(Keyword.get(opts, :if_modified_since)))
+    |> Operation.put_present("If-Unmodified-Since", date(Keyword.get(opts, :if_unmodified_since)))
+    |> Operation.put_present("x-ms-lease-id", Keyword.get(opts, :lease_id))
   end
 
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, to_string(value))
+  defp date(%DateTime{} = dt), do: Operation.http_date(dt)
+  defp date(value), do: value
 end

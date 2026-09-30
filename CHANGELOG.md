@@ -2,23 +2,46 @@
 
 ## v0.3.0 - 2026-09-30
 
+### Breaking
+
+- `Blob.download_stream/4` returns `{:ok, stream}` after one HEAD request and
+  fetches the blob with Range requests while you enumerate. A failed range
+  raises `AzureSDK.Storage.Blob.StreamError` during enumeration; v0.2.0
+  downloaded everything first and returned `{:error, error}` up front.
+- `download_stream/4` pins the blob's ETag: if the blob is overwritten while you
+  enumerate, the next range raises `StreamError` (HTTP 412) instead of returning
+  bytes from the new version.
+- `Blob.upload_stream/5` always returns `content: nil`; v0.2.0 returned the
+  uploaded bytes.
+- The `[:azure_sdk, :blob, :put]` event from `upload_stream/5` carries
+  `streaming: true` instead of `buffered: true`.
+- `Container.list_stream/2` and `list_blobs_stream/3` raise
+  `AzureSDK.Storage.Container.StreamError` when a page fails.
+
 ### Changed
 
 - `Blob.upload_stream/5` uses Put Block / Put Block List with bounded `:block_size`
-  (default 4 MiB) instead of buffering the full enumerable
+  (default 4 MiB) instead of buffering the full enumerable. Each upload uses a
+  random block-ID prefix, so concurrent uploads to one blob cannot mix blocks.
+  An upload that would need more than 50,000 blocks returns `BlockCountExceeded`.
 - `Blob.download_stream/4` uses HTTP Range requests with `:chunk_size` instead of
   a single full download
 
 ### Added
 
-- `AzureSDK.Storage.Conditions` — `If-*` and `:lease_id` headers for blob ops
-- `AzureSDK.Storage.Blob.Block` — `put_block/6`, `put_block_list/5`
-- `AzureSDK.Storage.Blob.Lease` — acquire, renew, change, release, break
+- `AzureSDK.Storage.Conditions`: `If-*` and `:lease_id` headers for blob ops;
+  date conditions accept a `DateTime`
+- `AzureSDK.Storage.Blob.Block`: `put_block/6`, `put_block_list/5`,
+  `upload_prefix/0`, `block_id/3`
+- `AzureSDK.Storage.Blob.Lease`: acquire, renew, change, release, break.
+  `acquire/4` always sends a proposed lease id so a retried acquire is safe.
 - `Blob.download/4` `:range` option for a single byte range
 - `Container.list_page/2`, `list_stream/2`, `list_blobs_page/3`, `list_blobs_stream/3`
   with `:prefix`, `:max_results`, `:marker`
-- `AzureSDK.Storage.Sas` — Shared Key blob/container SAS generation and
-  user-delegation key / SAS helpers
+- `AzureSDK.Storage.Sas`: Shared Key blob/container SAS generation and
+  user-delegation key / SAS helpers. Permissions are normalized to service
+  order, times are signed as UTC, and missing options return `InvalidArgument`.
+- `Blob.StreamError` and `Container.StreamError` exceptions
 
 ## v0.2.0 - 2026-09-29
 

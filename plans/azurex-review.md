@@ -35,7 +35,7 @@ AzureSDK.Storage.Blob   → blob operations only
 AzureSDK.Storage.Sas    → SAS generation (Shared Key + user-delegation)
 ```
 
-Adding Queue Storage in v0.4.0 means a new `AzureSDK.Storage.Queue` module reusing the same pipeline — not copying auth code.
+Adding Queue Storage in v0.4.0 means a new `AzureSDK.Storage.Queue` module reusing the same pipeline - not copying auth code.
 
 ### Authentication
 
@@ -64,32 +64,32 @@ Azurex has no built-in telemetry. AzureSDK emits events like `[:azure_sdk, :blob
 
 | Feature | Azurex | AzureSDK |
 |---------|--------|----------|
-| Upload blob | ✓ | ✓ (`upload`, `upload_stream`) |
-| Download blob | ✓ | ✓ (`download`, `download_stream`, optional `:range`) |
-| Delete blob | ✓ | ✓ |
-| Container CRUD | ✓ | ✓ (create, delete, list / `list_page` / `list_stream`) |
-| List blobs | ✓ | ✓ (eager + `list_blobs_page` / `list_blobs_stream`) |
-| Blob metadata | Partial | ✓ (get + set) |
-| Block blobs | ✓ | ✓ (`Blob.Block.put_block` / `put_block_list`; streaming uses them) |
-| Conditions | Varies | ✓ (`If-*`, `:lease_id` via `Storage.Conditions`) |
-| Blob leases | Varies | ✓ (acquire / renew / change / release / break) |
+| Upload blob | Yes | Yes (`upload`, `upload_stream`) |
+| Download blob | Yes | Yes (`download`, `download_stream`, optional `:range`) |
+| Delete blob | Yes | Yes |
+| Container CRUD | Yes | Yes (create, delete, list / `list_page` / `list_stream`) |
+| List blobs | Yes | Yes (eager + `list_blobs_page` / `list_blobs_stream`) |
+| Blob metadata | Partial | Yes (get + set) |
+| Block blobs | Yes | Yes (`Blob.Block.put_block` / `put_block_list`; streaming uses them) |
+| Conditions | Varies | Yes (`If-*`, `:lease_id` via `Storage.Conditions`) |
+| Blob leases | Varies | Yes (acquire / renew / change / release / break) |
 | Page/append blobs | Some support | Block blob focus (out of scope through v0.3.0) |
-| SAS consumption | ✓ | ✓ (`SASCredential`) |
-| SAS generation | ✓ | ✓ (`Storage.Sas` Shared Key + user-delegation) |
-| Entra / OAuth | Limited/absent | ✓ (v0.2.0+) |
+| SAS consumption | Yes | Yes (`SASCredential`) |
+| SAS generation | Yes | Yes (`Storage.Sas` Shared Key + user-delegation) |
+| Entra / OAuth | Limited/absent | Yes (v0.2.0+) |
 | Queue/Table | Limited/absent | Planned v0.4 / v0.5 |
 
 ## Azurite Compatibility
 
-Both libraries support local development with Azurite. AzureSDK handles the path-style **double account name** signing quirk explicitly in `SharedKey.canonicalized_resource/4` when `path_style: true`. Integration tests use `AzureSDK.AzuriteCase` with endpoint `http://127.0.0.1:10000/devstoreaccount1`. Streaming, leases, and Shared Key SAS generation are covered under Azurite where applicable; user-delegation SAS is unit-tested (Azurite coverage may be limited).
+Both libraries support local development with Azurite. AzureSDK handles the path-style **double account name** signing quirk explicitly in `SharedKey.canonicalized_resource/4` when `path_style: true`. Integration tests use `AzureSDK.AzuriteCase` with endpoint `http://127.0.0.1:10000/devstoreaccount1`. The Azurite suite covers streaming round trips, the full lease lifecycle, conditional writes, multi-page listing, and Shared Key SAS generation (a generated SAS must authorize a real download, and a write-only SAS must be refused). Service SAS signatures are also checked against reference values from the Azure SDK for Python. User-delegation SAS needs Entra ID, which Azurite does not provide, so it is tested against the documented string-to-sign format only.
 
 ## Migration Considerations
 
 1. **Replace config-based keys** with explicit `SharedKeyCredential` (or Entra credentials) structs.
-2. **Wrap client creation** — one `Storage.Client` per account, pass to all operations.
-3. **Update error handling** — pattern match on `%AzureSDK.Error{}` instead of raw HTTP errors.
-4. **Add telemetry handlers** — optional but recommended for production.
-5. **Update HTTP-related deps** — remove HTTPoison if it was only used for Azurex.
+2. **Wrap client creation** - one `Storage.Client` per account, pass to all operations.
+3. **Update error handling** - pattern match on `%AzureSDK.Error{}` instead of raw HTTP errors.
+4. **Add telemetry handlers** - optional but recommended for production.
+5. **Update HTTP-related deps** - remove HTTPoison if it was only used for Azurex.
 6. **Map SAS generation** from Azurex helpers to `AzureSDK.Storage.Sas.sign_blob/2` / `sign_container/2` (and user-delegation helpers when using TokenCredentials).
 
 See `guides/migrating_from_azurex.md` for a step-by-step migration guide.

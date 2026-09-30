@@ -56,8 +56,8 @@ Both use `Core.Pipeline.run/3`. Credential type determines signing - service mod
 
 1. Management: create storage account (v0.6.0)
 2. Management: configure firewall (v0.6.0)
-3. Data: upload logs (v0.1.0 ✓)
-4. Data: download uploads (v0.1.0 ✓)
+3. Data: upload logs (v0.1.0)
+4. Data: download uploads (v0.1.0)
 
 Steps 1–2 via Portal/CLI/Terraform today.
 

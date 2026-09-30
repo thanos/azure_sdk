@@ -11,6 +11,14 @@ defmodule AzureSDK.Storage.Sas do
   By default functions return `{:ok, query_string}` suitable for appending to a
   blob URL. Pass `as_credential: true` to receive `{:ok, %SASCredential{}}`.
 
+  ## Inputs
+
+  * Times are `DateTime`s in any zone; they are signed as UTC.
+  * Permissions may be given in any order and are normalized to the order the
+    service requires (`racwdxyltmeopi`). Unknown letters are rejected.
+  * A missing required option returns
+    `{:error, %AzureSDK.Error{code: "InvalidArgument"}}`; nothing raises.
+
   ## Examples
 
       cred = AzureSDK.Identity.SharedKeyCredential.new("acct", Base.encode64("sixteen-byte-key!"))
@@ -24,26 +32,28 @@ defmodule AzureSDK.Storage.Sas do
         )
   """
 
-  alias AzureSDK.Core.{Pipeline, Request}
+  alias AzureSDK.Error
   alias AzureSDK.Identity.{SASCredential, SharedKeyCredential}
-  alias AzureSDK.Storage.{Client, ServiceVersion}
+  alias AzureSDK.Storage.{Client, Operation, ServiceVersion}
+
+  @permission_order ~c"racwdxyltmeopi"
 
   @typedoc """
   User-delegation key returned by `get_user_delegation_key/2`.
 
-  Opaque map with Azure fields such as `signed_oid`, `signed_tid`,
+  Map with the Azure fields `signed_oid`, `signed_tid`,
   `signed_start`, `signed_expiry`, `signed_service`, `signed_version`, and
   `value` (Base64 signing key).
   """
-  @opaque user_delegation_key :: %{
-            signed_oid: String.t(),
-            signed_tid: String.t(),
-            signed_start: String.t(),
-            signed_expiry: String.t(),
-            signed_service: String.t(),
-            signed_version: String.t(),
-            value: String.t()
-          }
+  @type user_delegation_key :: %{
+          signed_oid: String.t(),
+          signed_tid: String.t(),
+          signed_start: String.t(),
+          signed_expiry: String.t(),
+          signed_service: String.t(),
+          signed_version: String.t(),
+          value: String.t()
+        }
 
   @typedoc """
   SAS generation result: a URL query string, or a `SASCredential` when
@@ -64,7 +74,7 @@ defmodule AzureSDK.Storage.Sas do
   * `:container` (required) - container name
   * `:blob` (required) - blob name
   * `:permissions` (required) - e.g. `"r"`, `"rw"`
-  * `:expiry` (required) - `DateTime` UTC
+  * `:expiry` (required) - `DateTime` (any zone; signed as UTC)
   * `:start` - optional `DateTime` start
   * `:api_version` - service version string (default `ServiceVersion.default/0`)
   * `:protocol` - e.g. `"https"`
@@ -104,13 +114,11 @@ defmodule AzureSDK.Storage.Sas do
   @spec sign_blob(SharedKeyCredential.t(), keyword()) ::
           {:ok, sas_result()} | {:error, AzureSDK.Error.t()}
   def sign_blob(%SharedKeyCredential{} = credential, opts) when is_list(opts) do
-    container = Keyword.fetch!(opts, :container)
-    blob = Keyword.fetch!(opts, :blob)
-    permissions = Keyword.fetch!(opts, :permissions)
-    expiry = Keyword.fetch!(opts, :expiry)
-    version = Keyword.get(opts, :api_version, ServiceVersion.default())
-    canonical = "/blob/#{credential.account}/#{container}/#{blob}"
-    sign_service(credential, permissions, expiry, canonical, "b", version, opts)
+    with {:ok, req} <-
+           Operation.require_opts(opts, [:container, :blob, :permissions, :expiry], :blob) do
+      canonical = "/blob/#{credential.account}/#{req.container}/#{req.blob}"
+      sign_service(credential, req, canonical, "b", opts)
+    end
   end
 
   @doc """
@@ -125,7 +133,7 @@ defmodule AzureSDK.Storage.Sas do
 
   * `:container` (required)
   * `:permissions` (required) - e.g. `"rl"`
-  * `:expiry` (required) - `DateTime` UTC
+  * `:expiry` (required) - `DateTime` (any zone; signed as UTC)
   * `:start`, `:api_version`, `:protocol`, `:ip`
   * `:as_credential` - when `true`, returns `SASCredential`
 
@@ -143,12 +151,10 @@ defmodule AzureSDK.Storage.Sas do
   @spec sign_container(SharedKeyCredential.t(), keyword()) ::
           {:ok, sas_result()} | {:error, AzureSDK.Error.t()}
   def sign_container(%SharedKeyCredential{} = credential, opts) when is_list(opts) do
-    container = Keyword.fetch!(opts, :container)
-    permissions = Keyword.fetch!(opts, :permissions)
-    expiry = Keyword.fetch!(opts, :expiry)
-    version = Keyword.get(opts, :api_version, ServiceVersion.default())
-    canonical = "/blob/#{credential.account}/#{container}"
-    sign_service(credential, permissions, expiry, canonical, "c", version, opts)
+    with {:ok, req} <- Operation.require_opts(opts, [:container, :permissions, :expiry], :blob) do
+      canonical = "/blob/#{credential.account}/#{req.container}"
+      sign_service(credential, req, canonical, "c", opts)
+    end
   end
 
   @doc """
@@ -161,13 +167,15 @@ defmodule AzureSDK.Storage.Sas do
 
   ## Options
 
-  * `:expiry` (required) - `DateTime` UTC when the key expires
+  * `:expiry` (required) - `DateTime` (any zone; signed as UTC) when the key expires
   * `:start` - optional `DateTime` start (default `DateTime.utc_now/0`)
 
   ## Returns
 
-  * `{:ok, user_delegation_key()}` opaque map for `sign_user_delegation_blob/2`
-  * `{:error, %AzureSDK.Error{}}`
+  * `{:ok, user_delegation_key()}` for `sign_user_delegation_blob/2`
+  * `{:error, %AzureSDK.Error{code: "InvalidResponse"}}` when the response is
+    not a user delegation key
+  * `{:error, %AzureSDK.Error{}}` for other failures
 
   ## Examples
 
@@ -180,35 +188,31 @@ defmodule AzureSDK.Storage.Sas do
   @spec get_user_delegation_key(Client.t(), keyword()) ::
           {:ok, user_delegation_key()} | {:error, AzureSDK.Error.t()}
   def get_user_delegation_key(%Client{} = client, opts) when is_list(opts) do
-    start = opts |> Keyword.get(:start, DateTime.utc_now()) |> format_iso8601()
-    expiry = opts |> Keyword.fetch!(:expiry) |> format_iso8601()
+    with {:ok, %{expiry: expiry}} <- Operation.require_opts(opts, [:expiry], :blob) do
+      start = Keyword.get(opts, :start, DateTime.utc_now())
 
-    body = """
-    <?xml version="1.0" encoding="utf-8"?>
-    <KeyInfo>
-      <Start>#{start}</Start>
-      <Expiry>#{expiry}</Expiry>
-    </KeyInfo>
-    """
+      body = """
+      <?xml version="1.0" encoding="utf-8"?>
+      <KeyInfo>
+        <Start>#{Operation.iso8601_utc(start)}</Start>
+        <Expiry>#{Operation.iso8601_utc(expiry)}</Expiry>
+      </KeyInfo>
+      """
 
-    request =
-      Request.new(
-        method: :post,
-        path: "/",
-        query: [{"restype", "service"}, {"comp", "userdelegationkey"}],
-        headers: %{
-          "x-ms-version" => client.api_version,
-          "Content-Type" => "application/xml",
-          "Content-Length" => Integer.to_string(byte_size(body))
-        },
-        body: body,
-        service: :blob,
-        operation: :get_user_delegation_key,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
-      {:ok, parse_user_delegation_key(response.body || "")}
+      with {:ok, response} <-
+             Operation.run(client,
+               method: :post,
+               path: "/",
+               query: [{"restype", "service"}, {"comp", "userdelegationkey"}],
+               headers: %{
+                 "Content-Type" => "application/xml",
+                 "Content-Length" => Integer.to_string(byte_size(body))
+               },
+               body: body,
+               operation: :get_user_delegation_key
+             ) do
+        parse_user_delegation_key(response.body || "")
+      end
     end
   end
 
@@ -217,7 +221,7 @@ defmodule AzureSDK.Storage.Sas do
 
   ## Parameters
 
-  * `udk` - opaque `user_delegation_key()`
+  * `udk` - `user_delegation_key()`
   * `opts` - keyword list
 
   ## Options
@@ -226,7 +230,7 @@ defmodule AzureSDK.Storage.Sas do
   * `:container` (required)
   * `:blob` (required)
   * `:permissions` (required)
-  * `:expiry` (required) - `DateTime` UTC
+  * `:expiry` (required) - `DateTime`
   * `:start`, `:api_version`, `:protocol`, `:ip`
   * `:as_credential` - when `true`, returns `SASCredential`
 
@@ -257,52 +261,48 @@ defmodule AzureSDK.Storage.Sas do
   @spec sign_user_delegation_blob(user_delegation_key(), keyword()) ::
           {:ok, sas_result()} | {:error, AzureSDK.Error.t()}
   def sign_user_delegation_blob(udk, opts) when is_map(udk) and is_list(opts) do
-    account = Keyword.fetch!(opts, :account)
-    container = Keyword.fetch!(opts, :container)
-    blob = Keyword.fetch!(opts, :blob)
-    permissions = Keyword.fetch!(opts, :permissions)
-    expiry = Keyword.fetch!(opts, :expiry)
-    version = Keyword.get(opts, :api_version, ServiceVersion.default())
-    start = Keyword.get(opts, :start)
-    canonical = "/blob/#{account}/#{container}/#{blob}"
+    required = [:account, :container, :blob, :permissions, :expiry]
 
-    string_to_sign =
-      Enum.join(
-        [
-          permissions,
-          format_sas_time(start),
-          format_sas_time(expiry),
-          canonical,
-          udk.signed_oid,
-          udk.signed_tid,
-          udk.signed_start,
-          udk.signed_expiry,
-          udk.signed_service,
-          udk.signed_version,
-          "",
-          "",
-          Keyword.get(opts, :ip, ""),
-          Keyword.get(opts, :protocol, ""),
-          version,
-          "b",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          ""
-        ],
-        "\n"
-      )
+    with {:ok, req} <- Operation.require_opts(opts, required, :blob),
+         {:ok, permissions} <- normalize_permissions(req.permissions) do
+      version = Keyword.get(opts, :api_version, ServiceVersion.default())
+      start = format_time(Keyword.get(opts, :start))
+      expiry = format_time(req.expiry)
 
-    with {:ok, sig} <- hmac_base64(udk.value, string_to_sign) do
-      params =
+      # Field order for service versions 2020-12-06 and later.
+      fields = [
+        signed_permissions: permissions,
+        signed_start: start,
+        signed_expiry: expiry,
+        canonicalized_resource: "/blob/#{req.account}/#{req.container}/#{req.blob}",
+        signed_key_object_id: udk.signed_oid,
+        signed_key_tenant_id: udk.signed_tid,
+        signed_key_start: udk.signed_start,
+        signed_key_expiry: udk.signed_expiry,
+        signed_key_service: udk.signed_service,
+        signed_key_version: udk.signed_version,
+        signed_authorized_user_object_id: "",
+        signed_unauthorized_user_object_id: "",
+        signed_correlation_id: "",
+        signed_ip: Keyword.get(opts, :ip, ""),
+        signed_protocol: Keyword.get(opts, :protocol, ""),
+        signed_version: version,
+        signed_resource: "b",
+        signed_snapshot_time: "",
+        signed_encryption_scope: "",
+        rscc: "",
+        rscd: "",
+        rsce: "",
+        rscl: "",
+        rsct: ""
+      ]
+
+      with {:ok, sig} <- hmac_base64(udk.value, string_to_sign(fields)) do
         %{
           "sv" => version,
           "sr" => "b",
           "sp" => permissions,
-          "se" => format_sas_time(expiry),
+          "se" => expiry,
           "skoid" => udk.signed_oid,
           "sktid" => udk.signed_tid,
           "skt" => udk.signed_start,
@@ -311,56 +311,60 @@ defmodule AzureSDK.Storage.Sas do
           "skv" => udk.signed_version,
           "sig" => sig
         }
-        |> maybe_put_param("st", format_sas_time(start))
-        |> maybe_put_param("sip", Keyword.get(opts, :ip))
-        |> maybe_put_param("spr", Keyword.get(opts, :protocol))
-
-      finish_sas(params, opts)
+        |> put_optional_params(start, opts)
+        |> finish_sas(opts)
+      end
     end
   end
 
-  defp sign_service(credential, permissions, expiry, canonical, resource, version, opts) do
-    start = Keyword.get(opts, :start)
+  @doc false
+  # Joins string-to-sign fields with newlines. Exposed for known-answer tests.
+  @spec string_to_sign(keyword(String.t())) :: String.t()
+  def string_to_sign(fields), do: fields |> Keyword.values() |> Enum.join("\n")
 
-    string_to_sign =
-      Enum.join(
-        [
-          permissions,
-          format_sas_time(start),
-          format_sas_time(expiry),
-          canonical,
-          "",
-          Keyword.get(opts, :ip, ""),
-          Keyword.get(opts, :protocol, ""),
-          version,
-          resource,
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          ""
-        ],
-        "\n"
-      )
+  defp sign_service(credential, req, canonical, resource, opts) do
+    with {:ok, permissions} <- normalize_permissions(req.permissions) do
+      version = Keyword.get(opts, :api_version, ServiceVersion.default())
+      start = format_time(Keyword.get(opts, :start))
+      expiry = format_time(req.expiry)
 
-    with {:ok, sig} <- hmac_base64(credential.key, string_to_sign) do
-      params =
-        %{
-          "sv" => version,
-          "sr" => resource,
-          "sp" => permissions,
-          "se" => format_sas_time(expiry),
-          "sig" => sig
-        }
-        |> maybe_put_param("st", format_sas_time(start))
-        |> maybe_put_param("sip", Keyword.get(opts, :ip))
-        |> maybe_put_param("spr", Keyword.get(opts, :protocol))
+      # Field order for service versions 2020-12-06 and later.
+      fields = [
+        signed_permissions: permissions,
+        signed_start: start,
+        signed_expiry: expiry,
+        canonicalized_resource: canonical,
+        signed_identifier: "",
+        signed_ip: Keyword.get(opts, :ip, ""),
+        signed_protocol: Keyword.get(opts, :protocol, ""),
+        signed_version: version,
+        signed_resource: resource,
+        signed_snapshot_time: "",
+        signed_encryption_scope: "",
+        rscc: "",
+        rscd: "",
+        rsce: "",
+        rscl: "",
+        rsct: ""
+      ]
 
-      finish_sas(params, opts)
+      with {:ok, sig} <- hmac_base64(credential.key, string_to_sign(fields)) do
+        %{"sv" => version, "sr" => resource, "sp" => permissions, "se" => expiry, "sig" => sig}
+        |> put_optional_params(start, opts)
+        |> finish_sas(opts)
+      end
     end
   end
+
+  defp put_optional_params(params, start, opts) do
+    params
+    |> put_param("st", start)
+    |> put_param("sip", Keyword.get(opts, :ip))
+    |> put_param("spr", Keyword.get(opts, :protocol))
+  end
+
+  defp put_param(params, _key, value) when value in [nil, ""], do: params
+  defp put_param(params, key, value), do: Map.put(params, key, value)
 
   defp finish_sas(params, opts) do
     if Keyword.get(opts, :as_credential, false) do
@@ -370,46 +374,69 @@ defmodule AzureSDK.Storage.Sas do
     end
   end
 
-  defp hmac_base64(key_b64, string) do
-    case Base.decode64(key_b64) do
-      {:ok, key} ->
-        {:ok, Base.encode64(:crypto.mac(:hmac, :sha256, key, string))}
+  defp normalize_permissions(permissions) when is_binary(permissions) do
+    chars = String.to_charlist(permissions)
 
-      :error ->
+    case chars -- @permission_order do
+      [] ->
+        {:ok, @permission_order |> Enum.filter(&(&1 in chars)) |> List.to_string()}
+
+      unknown ->
         {:error,
-         AzureSDK.Error.new(
-           code: "InvalidCredential",
-           message: "SAS signing key is not valid Base64",
+         Error.new(
+           code: "InvalidArgument",
+           message: "Unknown SAS permission(s): #{inspect(List.to_string(unknown))}",
            service: :blob
          )}
     end
   end
 
-  defp format_sas_time(nil), do: ""
+  defp hmac_base64(key_b64, string) do
+    case Base.decode64(key_b64) do
+      {:ok, key} when key != "" ->
+        {:ok, Base.encode64(:crypto.mac(:hmac, :sha256, key, string))}
 
-  defp format_sas_time(%DateTime{} = dt) do
-    dt |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+      _ ->
+        {:error,
+         Error.new(
+           code: "InvalidCredential",
+           message: "SAS signing key is empty or not valid Base64",
+           service: :blob
+         )}
+    end
   end
 
-  defp format_iso8601(%DateTime{} = dt) do
-    dt |> DateTime.truncate(:second) |> DateTime.to_iso8601()
-  end
+  defp format_time(nil), do: ""
+  defp format_time(%DateTime{} = dt), do: Operation.iso8601_utc(dt)
 
-  defp maybe_put_param(map, _key, nil), do: map
-  defp maybe_put_param(map, _key, ""), do: map
-  defp maybe_put_param(map, key, value), do: Map.put(map, key, value)
+  @udk_fields [
+    signed_oid: "SignedOid",
+    signed_tid: "SignedTid",
+    signed_start: "SignedStart",
+    signed_expiry: "SignedExpiry",
+    signed_service: "SignedService",
+    signed_version: "SignedVersion",
+    value: "Value"
+  ]
 
   defp parse_user_delegation_key(xml) do
     import SweetXml
 
-    %{
-      signed_oid: xpath(xml, ~x"//SignedOid/text()"s),
-      signed_tid: xpath(xml, ~x"//SignedTid/text()"s),
-      signed_start: xpath(xml, ~x"//SignedStart/text()"s),
-      signed_expiry: xpath(xml, ~x"//SignedExpiry/text()"s),
-      signed_service: xpath(xml, ~x"//SignedService/text()"s),
-      signed_version: xpath(xml, ~x"//SignedVersion/text()"s),
-      value: xpath(xml, ~x"//Value/text()"s)
-    }
+    udk = Map.new(@udk_fields, fn {key, tag} -> {key, xpath(xml, ~x"//#{tag}/text()"s)} end)
+
+    case Enum.filter(@udk_fields, fn {key, _tag} -> udk[key] == "" end) do
+      [] -> {:ok, udk}
+      missing -> {:error, invalid_udk("missing #{Enum.map_join(missing, ", ", &elem(&1, 1))}")}
+    end
+  catch
+    :exit, reason -> {:error, invalid_udk("not XML: #{inspect(reason)}")}
+  end
+
+  defp invalid_udk(detail) do
+    Error.new(
+      code: "InvalidResponse",
+      message: "User delegation key response is invalid (#{detail})",
+      service: :blob
+    )
   end
 end

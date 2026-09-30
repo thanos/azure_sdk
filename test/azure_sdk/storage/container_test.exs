@@ -1,6 +1,8 @@
 defmodule AzureSDK.Storage.ContainerTest do
   use AzureSDK.AzureMockCase, async: true
 
+  @no_retry %{max_attempts: 1, base_delay_ms: 1, max_delay_ms: 1, jitter: false}
+
   alias AzureSDK.Storage.Container
 
   test "creates a container", %{bypass: bypass, client: client} do
@@ -88,6 +90,47 @@ defmodule AzureSDK.Storage.ContainerTest do
     assert Enum.map(Container.list_blobs_stream(client, "uploads"), & &1.name) == ["a.txt"]
   end
 
+  test "list keeps page order across three pages",
+       %{bypass: bypass, client: client} do
+    AzureMock.stub_list_containers_paginated(bypass, [
+      %{containers: ["a", "b"], marker: "page-2"},
+      %{containers: ["c"], marker: "page-3"},
+      %{containers: ["d"], marker: nil}
+    ])
+
+    assert {:ok, containers} = Container.list(client, max_results: 2)
+    assert Enum.map(containers, & &1.name) == ["a", "b", "c", "d"]
+  end
+
+  test "list_stream raises StreamError when a later page fails", %{bypass: bypass} do
+    client = AzureMock.client(bypass, retry: @no_retry)
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    Bypass.expect(bypass, "GET", AzureMock.path([]), fn conn ->
+      case Agent.get_and_update(calls, &{&1, &1 + 1}) do
+        0 -> Plug.Conn.resp(conn, 200, list_containers_xml(["a"], "next"))
+        _ -> Plug.Conn.resp(conn, 500, "")
+      end
+    end)
+
+    stream = Container.list_stream(client)
+
+    assert %Container.StreamError{reason: %AzureSDK.Error{status: 500}} =
+             assert_raise(Container.StreamError, fn -> Enum.to_list(stream) end)
+  end
+
+  test "list_blobs_stream raises StreamError when a page fails", %{bypass: bypass} do
+    client = AzureMock.client(bypass, retry: @no_retry)
+
+    Bypass.expect(bypass, "GET", AzureMock.path(["uploads"]), fn conn ->
+      Plug.Conn.resp(conn, 500, "")
+    end)
+
+    assert_raise Container.StreamError, fn ->
+      client |> Container.list_blobs_stream("uploads") |> Enum.to_list()
+    end
+  end
+
   test "returns container metadata", %{bypass: bypass, client: client} do
     AzureMock.stub_head_container(bypass, "uploads", %{"owner" => "team"})
 
@@ -142,5 +185,16 @@ defmodule AzureSDK.Storage.ContainerTest do
 
     assert {:error, %{code: "ContainerNotFound", status: 404, service: :blob}} =
              Container.create(client, "missing")
+  end
+
+  defp list_containers_xml(names, marker) do
+    entries =
+      Enum.map_join(
+        names,
+        "",
+        &"<Container><Name>#{&1}</Name><Properties></Properties></Container>"
+      )
+
+    ~s(<?xml version="1.0" encoding="utf-8"?><EnumerationResults><Containers>#{entries}</Containers><NextMarker>#{marker}</NextMarker></EnumerationResults>)
   end
 end
