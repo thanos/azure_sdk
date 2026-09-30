@@ -95,9 +95,9 @@ Double-account signing handled automatically.
 
 | Feature | Status |
 |---------|--------|
-| SAS generation | Planned |
+| SAS generation | `AzureSDK.Storage.Sas` |
 | Page blobs | Block blobs only |
-| Queue/Table | v0.3.0 / v0.4.0 |
+| Queue/Table | v0.4.0 / v0.5.0 |
 
 ## Incremental Strategy
 

@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.0 - 2026-09-30
+
+### Changed
+
+- `Blob.upload_stream/5` uses Put Block / Put Block List with bounded `:block_size`
+  (default 4 MiB) instead of buffering the full enumerable
+- `Blob.download_stream/4` uses HTTP Range requests with `:chunk_size` instead of
+  a single full download
+
+### Added
+
+- `AzureSDK.Storage.Conditions` — `If-*` and `:lease_id` headers for blob ops
+- `AzureSDK.Storage.Blob.Block` — `put_block/6`, `put_block_list/5`
+- `AzureSDK.Storage.Blob.Lease` — acquire, renew, change, release, break
+- `Blob.download/4` `:range` option for a single byte range
+- `Container.list_page/2`, `list_stream/2`, `list_blobs_page/3`, `list_blobs_stream/3`
+  with `:prefix`, `:max_results`, `:marker`
+- `AzureSDK.Storage.Sas` — Shared Key blob/container SAS generation and
+  user-delegation key / SAS helpers
+
 ## v0.2.0 - 2026-09-29
 
 ### Breaking

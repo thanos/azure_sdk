@@ -63,6 +63,31 @@ defmodule AzureSDK.Storage.ContainerTest do
     assert Enum.map(blobs, & &1.name) == ["a.txt", "b.txt"]
   end
 
+  test "list_page returns a single page", %{bypass: bypass, client: client} do
+    AzureMock.stub_list_containers(bypass, ["only"])
+
+    assert {:ok, %{items: [%{name: "only"}], marker: nil}} =
+             Container.list_page(client, max_results: 5, prefix: "o")
+  end
+
+  test "list_stream enumerates containers", %{bypass: bypass, client: client} do
+    AzureMock.stub_list_containers_paginated(bypass, [
+      %{containers: ["a"], marker: "next"},
+      %{containers: ["b"], marker: nil}
+    ])
+
+    assert Enum.map(Container.list_stream(client), & &1.name) == ["a", "b"]
+  end
+
+  test "list_blobs_page and list_blobs_stream", %{bypass: bypass, client: client} do
+    AzureMock.stub_list_blobs(bypass, "uploads", ["a.txt"])
+
+    assert {:ok, %{items: [%{name: "a.txt"}], marker: nil}} =
+             Container.list_blobs_page(client, "uploads", max_results: 10, prefix: "a")
+
+    assert Enum.map(Container.list_blobs_stream(client, "uploads"), & &1.name) == ["a.txt"]
+  end
+
   test "returns container metadata", %{bypass: bypass, client: client} do
     AzureMock.stub_head_container(bypass, "uploads", %{"owner" => "team"})
 

@@ -23,4 +23,7 @@ defmodule AzureSDK.DoctestTest do
   doctest AzureSDK.Storage.ServiceVersion
   doctest AzureSDK.Storage.Path
   doctest AzureSDK.Storage.Metadata
+  doctest AzureSDK.Storage.Conditions
+  doctest AzureSDK.Storage.Blob.Block
+  doctest AzureSDK.Storage.Sas
 end
