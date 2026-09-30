@@ -41,7 +41,10 @@ Before backoff sleep: `%{count: 1, delay_ms: int}`, metadata includes `attempt`.
 
 | Event | Function | Metadata |
 |-------|----------|----------|
-| `[:azure_sdk, :blob, :put]` | `upload/4`, `upload_stream/4` | `container`, `name`, optional `buffered: true` |
+| `[:azure_sdk, :blob, :put]` | `upload/5`, `upload_stream/5` | `container`, `name`, optional `streaming: true` |
+| `[:azure_sdk, :blob, :put_block]` | `Blob.Block.put_block/6` | `container`, `name` |
+| `[:azure_sdk, :blob, :put_block_list]` | `Blob.Block.put_block_list/5` | `container`, `name`, `block_count` |
+| `[:azure_sdk, :blob, :lease_*]` | `Blob.Lease.*` | `container`, `name` |
 | `[:azure_sdk, :blob, :get]` | `download/4` | `container`, `name` |
 | `[:azure_sdk, :blob, :delete]` | `delete/3` | `container`, `name` |
 | `[:azure_sdk, :blob, :metadata]` | `metadata/3` | `container`, `name` |
@@ -54,7 +57,9 @@ Before backoff sleep: `%{count: 1, delay_ms: int}`, metadata includes `attempt`.
 | `[:azure_sdk, :container, :create]` | `create/2` | `name` |
 | `[:azure_sdk, :container, :delete]` | `delete/2` | `name` |
 | `[:azure_sdk, :container, :list]` | `list/1` | `%{}` |
-| `[:azure_sdk, :container, :list_blobs]` | `list_blobs/2` | `container` |
+| `[:azure_sdk, :container, :list_blobs]` | `list_blobs/3` | `container` |
+| `[:azure_sdk, :container, :list_blobs_page]` | `list_blobs_page/3` | `container` |
+| `[:azure_sdk, :container, :list_page]` | `list_page/2` | |
 | `[:azure_sdk, :container, :exists]` | `exists?/2` | `name` |
 | `[:azure_sdk, :container, :metadata]` | `metadata/2` | `name` |
 

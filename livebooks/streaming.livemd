@@ -1,16 +1,16 @@
-# Buffered enumerables with AzureSDK
+# Buffered and ranged streams with AzureSDK
 
 ```elixir
 Mix.install([
   # {:azure_sdk, path: Path.expand("..", __DIR__)},
-  {:azure_sdk, "~> 0.2.0"},
+  {:azure_sdk, "~> 0.3.0"},
 ])
 ```
 
 ## Overview
 
-`upload_stream/4` and `download_stream/4` accept enumerables but buffer content in
-memory in the current release. Chunked streaming is planned later.
+`upload_stream/5` stages Put Block chunks (default 4 MiB) and commits with Put
+Block List. `download_stream/4` fetches the blob with HTTP Range requests.
 
 Requires Azurite (`docker compose up -d`).
 
@@ -40,16 +40,23 @@ end
 ## Stream upload
 
 ```elixir
-stream = Stream.repeatedly(fn -> "chunk" end) |> Stream.take(3)
-{:ok, _} = AzureSDK.Storage.Blob.upload_stream(client, container, "chunks.bin", stream)
+stream = Stream.repeatedly(fn -> "chunk-data-" end) |> Stream.take(20)
+
+{:ok, _} =
+  AzureSDK.Storage.Blob.upload_stream(client, container, "chunks.bin", stream,
+    block_size: 32
+  )
+
 :ok
 ```
 
 ## Stream download
 
 ```elixir
-{:ok, stream} = AzureSDK.Storage.Blob.download_stream(client, container, "chunks.bin")
-stream |> Enum.join()
+{:ok, stream} =
+  AzureSDK.Storage.Blob.download_stream(client, container, "chunks.bin", chunk_size: 64)
+
+stream |> Enum.join() |> byte_size()
 ```
 
 ## Clean up

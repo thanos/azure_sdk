@@ -10,16 +10,16 @@ Azure platform SDK for Elixir and Erlang.
 
 AzureSDK is not a Blob Storage library. It is a long-term, multi-service Azure SDK built on BEAM-native patterns: explicit client structs, OTP-ready design, first-class telemetry, and a reusable Req pipeline.
 
-**v0.2.0** adds Entra ID / OAuth credentials, a supervised token cache, and idempotency-aware retries on top of the Blob Storage foundation. Queue, Table, Management, and BEAM integrations follow in later releases (see Roadmap below).
+**v0.3.0** adds production Blob capabilities: bounded-memory block upload/download streams, conditional headers and blob leases, lazy listing, and SAS generation. Queue, Table, Management, and BEAM integrations follow later (see Roadmap).
 
-See [CHANGELOG](CHANGELOG.md) for breaking changes from v0.1.0 (`sign_request/2` → `authorize_request/2`). Identity guide: [`guides/azure_identity.md`](guides/azure_identity.md).
+See [CHANGELOG](CHANGELOG.md) for migration notes. Identity guide: [`guides/azure_identity.md`](guides/azure_identity.md).
 
 ## Installation
 
 ```elixir
 def deps do
   [
-    {:azure_sdk, "~> 0.2.0"}
+    {:azure_sdk, "~> 0.3.0"}
   ]
 end
 ```
@@ -41,6 +41,17 @@ client =
 
 {:ok, _} = AzureSDK.Storage.Container.create(client, "uploads")
 {:ok, blob} = AzureSDK.Storage.Blob.upload(client, "uploads", "hello.txt", "Hello, Azure!")
+```
+
+### Stream upload / download
+
+```elixir
+{:ok, _} =
+  AzureSDK.Storage.Blob.upload_stream(client, "uploads", "large.bin", file_stream,
+    block_size: 4 * 1024 * 1024
+  )
+
+{:ok, chunks} = AzureSDK.Storage.Blob.download_stream(client, "uploads", "large.bin")
 ```
 
 ### Local development with Azurite
@@ -92,28 +103,20 @@ v0.1.0 established the platform foundation. Releases after v0.2.0 deepen Blob be
 | **v0.6.0** | Management Plane | ARM client, LRO, StorageAccount |
 | **v0.7.0** | BEAM Integrations | Broadway, Flow (use-case driven) |
 
-### v0.2.0 - Identity + Core Contracts (Current)
-
-Intentionally breaking pre-1.0 release:
-
-- Fallible `Credential.authorize_request/2` and `TokenCredential.get_token/3`
-- `ClientSecretCredential`, `ManagedIdentityCredential`, `WorkloadIdentityCredential`
-- `EnvironmentCredential`, `DefaultAzureCredential`
-- Supervised `TokenCache` with coalesce + telemetry
-- `Pipeline.Bearer`
-- Retry: jitter, `Retry-After` / `x-ms-retry-after-ms`, idempotent transport retries, 401 refresh-once
-- `Storage.ServiceVersion`
-
-### v0.3.0 - Production Blob Storage
+### v0.3.0 - Production Blob Storage (Current)
 
 - Bounded-memory `upload_stream` via Put Block / Put Block List
 - Range-based `download_stream`
-- ETag conditions, leases, richer listing (`list_page` / lazy stream)
-- SAS **generation** (including user-delegation SAS)
+- ETag conditions, blob leases, richer listing (`list_page` / lazy stream)
+- SAS generation (Shared Key service SAS and user-delegation helpers)
+
+### v0.4.0 - Queue Storage
+
+Queue CRUD and messages with idempotent-safe retry defaults from v0.2.0.
 
 ### Later
 
-Queue must not inherit naive retry; Table needs a distinct Shared Key format; ARM benefits from mature OAuth/paging/retry. Design notes live under [`plans/`](https://github.com/thanos/azure_sdk/tree/main/plans).
+Table needs a distinct Shared Key format; ARM benefits from mature OAuth/paging/retry. Design notes live under [`plans/`](https://github.com/thanos/azure_sdk/tree/main/plans).
 
 ### Versioning
 
@@ -127,6 +130,7 @@ SemVer pre-1.0.0: minor versions may include breaking changes with CHANGELOG not
 | Architecture plans | [`plans/`](https://github.com/thanos/azure_sdk/tree/main/plans) |
 | Livebooks | [`livebooks/`](https://github.com/thanos/azure_sdk/tree/main/livebooks) |
 | Changelog | [`CHANGELOG.md`](https://github.com/thanos/azure_sdk/blob/main/CHANGELOG.md) |
+| Security / dependency advisories | [`SECURITY.md`](https://github.com/thanos/azure_sdk/blob/main/SECURITY.md) |
 
 ## Telemetry
 

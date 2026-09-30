@@ -2,51 +2,47 @@ defmodule AzureSDK.Storage.Container do
   @moduledoc """
   Azure Blob Storage container operations.
 
-  `list/2` and `list_blobs/3` follow Azure pagination markers until all results
-  are retrieved.
+  Eager helpers (`list/2`, `list_blobs/3`) follow pagination until complete.
+  Page and stream APIs expose markers for lazy consumption.
 
-  ## Container map
+  ## Container map (`t:container/0`)
 
       %{
         name: "uploads",
-        properties: %{etag: "...", last_modified: "..."},
+        properties: %{etag: "\\"0x8D…\\"", last_modified: "Wed, 01 Jan 2025 00:00:00 GMT"},
         metadata: %{"env" => "dev"}
       }
 
-  ## Errors
+  ## List page (`t:page/0`)
 
-  Failures return `{:error, %AzureSDK.Error{}}`. Functions do not raise for
-  Azure HTTP failures. `exists?/2` is the exception among return shapes: it
-  returns a boolean on success or not-found, and `{:error, error}` otherwise.
-
-  ## Examples
-
-      {:ok, container} =
-        AzureSDK.Storage.Container.create(client, "uploads",
-          metadata: %{"env" => "dev"}
-        )
-
-      true = AzureSDK.Storage.Container.exists?(client, "uploads")
-      {:ok, containers} = AzureSDK.Storage.Container.list(client)
-      {:ok, :deleted} = AzureSDK.Storage.Container.delete(client, "uploads")
+      %{items: [%{name: "uploads", ...}], marker: nil}
+      %{items: [%{name: "a.txt", ...}], marker: "continuation-token"}
   """
 
-  alias AzureSDK.Core.{Pipeline, Request, Telemetry}
+  alias AzureSDK.Core.Telemetry
   alias AzureSDK.Core.Xml.{ListBlobs, ListContainers}
-  alias AzureSDK.Storage.{Client, Metadata, Path}
+  alias AzureSDK.Storage.{Client, Metadata, Operation, Path}
 
   @typedoc """
   Container result map.
 
   * `:name` - container name
-  * `:properties` - etag and last modified when known
-  * `:metadata` - user metadata
+  * `:properties` - typically `etag` and `last_modified`
+  * `:metadata` - user metadata without the `x-ms-meta-` prefix
   """
   @type container :: %{
           name: String.t(),
           properties: map(),
           metadata: map()
         }
+
+  @typedoc """
+  A single list page with continuation marker.
+
+  * `:items` - containers or blob maps for this page
+  * `:marker` - opaque continuation token, or `nil` when finished
+  """
+  @type page :: %{items: [map()], marker: String.t() | nil}
 
   @doc """
   Creates a container.
@@ -55,19 +51,22 @@ defmodule AzureSDK.Storage.Container do
 
   * `client` - `AzureSDK.Storage.Client`
   * `name` - container name
-  * `opts` - optional keyword list:
-    * `:public_access` - public access level (for example `:blob` or `:container`)
-    * `:metadata` - string-keyed user metadata
+  * `opts` - optional keyword list (default `[]`)
 
-  ## Returns
+  ## Options
 
-  * `{:ok, container()}`
-  * `{:error, %AzureSDK.Error{}}` - including conflict when the container exists
+  * `:public_access` - `:blob` or `:container`
+  * `:metadata` - string-keyed user metadata
 
   ## Examples
 
-      {:ok, %{name: "uploads"}} =
-        AzureSDK.Storage.Container.create(client, "uploads")
+      {:ok, container} = AzureSDK.Storage.Container.create(client, "uploads")
+
+      {:ok, container} =
+        AzureSDK.Storage.Container.create(client, "public",
+          public_access: :blob,
+          metadata: %{"env" => "dev"}
+        )
   """
   @spec create(Client.t(), String.t(), keyword()) ::
           {:ok, container()} | {:error, AzureSDK.Error.t()}
@@ -75,23 +74,19 @@ defmodule AzureSDK.Storage.Container do
     Telemetry.emit_operation(:container, :create, %{name: name})
 
     headers =
-      %{"x-ms-version" => client.api_version}
-      |> Map.merge(public_access_header(opts))
+      %{}
+      |> Operation.put_present("x-ms-blob-public-access", Keyword.get(opts, :public_access))
       |> Map.merge(Metadata.headers(Keyword.get(opts, :metadata, %{})))
 
-    request =
-      Request.new(
-        method: :put,
-        path: Path.join([name]),
-        query: [{"restype", "container"}],
-        headers: headers,
-        body: "",
-        service: :blob,
-        operation: :create_container,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, response} <-
+           Operation.run(client,
+             method: :put,
+             path: Path.join([name]),
+             query: [{"restype", "container"}],
+             headers: headers,
+             body: "",
+             operation: :create_container
+           ) do
       {:ok, container_from_response(name, response, opts)}
     end
   end
@@ -99,10 +94,11 @@ defmodule AzureSDK.Storage.Container do
   @doc """
   Deletes a container.
 
-  ## Returns
+  ## Parameters
 
-  * `{:ok, :deleted}`
-  * `{:error, %AzureSDK.Error{}}`
+  * `client` - `AzureSDK.Storage.Client`
+  * `name` - container name
+  * `opts` - accepted for API symmetry; currently unused (default `[]`)
 
   ## Examples
 
@@ -113,73 +109,216 @@ defmodule AzureSDK.Storage.Container do
   def delete(client, name, _opts \\ []) do
     Telemetry.emit_operation(:container, :delete, %{name: name})
 
-    request =
-      Request.new(
-        method: :delete,
-        path: Path.join([name]),
-        query: [{"restype", "container"}],
-        headers: %{"x-ms-version" => client.api_version},
-        service: :blob,
-        operation: :delete_container,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, _} <- Pipeline.run(Client.to_core_client(client), request) do
+    with {:ok, _} <-
+           Operation.run(client,
+             method: :delete,
+             path: Path.join([name]),
+             query: [{"restype", "container"}],
+             operation: :delete_container
+           ) do
       {:ok, :deleted}
     end
   end
 
   @doc """
-  Lists containers in the storage account.
+  Lists all containers (eager).
 
-  Follows `NextMarker` pagination until all containers are returned.
+  Follows continuation markers until complete. Accepts the same options as
+  `list_page/2`. `:max_results` is the page size, not a limit on the total;
+  `:marker` is managed internally.
 
-  ## Returns
+  ## Parameters
 
-  * `{:ok, [container()]}`
-  * `{:error, %AzureSDK.Error{}}`
+  * `client` - `AzureSDK.Storage.Client`
+  * `opts` - optional keyword list (default `[]`)
 
   ## Examples
 
       {:ok, containers} = AzureSDK.Storage.Container.list(client)
+
+      {:ok, containers} =
+        AzureSDK.Storage.Container.list(client, prefix: "prod-", max_results: 100)
   """
   @spec list(Client.t(), keyword()) :: {:ok, [container()]} | {:error, AzureSDK.Error.t()}
-  def list(client, _opts \\ []) do
+  def list(client, opts \\ []) do
     Telemetry.emit_operation(:container, :list, %{})
-    list_containers(client, nil, [])
+    Operation.collect_pages(&list_page(client, Keyword.put(opts, :marker, &1)))
   end
 
   @doc """
-  Lists blobs in a container.
+  Lists one page of containers.
 
-  Follows `NextMarker` pagination until all blobs are returned.
+  ## Parameters
 
-  ## Returns
+  * `client` - `AzureSDK.Storage.Client`
+  * `opts` - optional keyword list (default `[]`)
 
-  * `{:ok, [map()]}` - parsed blob entries from the list XML
-  * `{:error, %AzureSDK.Error{}}`
+  ## Options
+
+  * `:marker` - continuation token from a previous page
+  * `:max_results` - page size (the service caps it at 5,000)
+  * `:prefix` - name prefix filter
+
+  ## Examples
+
+      {:ok, %{items: items, marker: nil}} =
+        AzureSDK.Storage.Container.list_page(client, max_results: 50, prefix: "app-")
+
+      {:ok, %{items: more, marker: next}} =
+        AzureSDK.Storage.Container.list_page(client, marker: marker, max_results: 50)
+  """
+  @spec list_page(Client.t(), keyword()) :: {:ok, page()} | {:error, AzureSDK.Error.t()}
+  def list_page(client, opts \\ []) do
+    Telemetry.emit_operation(:container, :list_page, %{})
+
+    with {:ok, response} <-
+           Operation.run(client,
+             method: :get,
+             path: "/",
+             query: [{"comp", "list"} | optional_query(opts)],
+             operation: :list_containers
+           ) do
+      page = ListContainers.parse_page(response.body || "")
+      {:ok, %{items: page.items, marker: blank_to_nil(page.marker)}}
+    end
+  end
+
+  @doc """
+  Lazily streams containers across pages.
+
+  Accepts the same options as `list_page/2`. Mid-stream failures raise
+  `AzureSDK.Storage.Container.StreamError`.
+
+  ## Parameters
+
+  * `client` - `AzureSDK.Storage.Client`
+  * `opts` - optional keyword list (default `[]`)
+
+  ## Examples
+
+      names =
+        client
+        |> AzureSDK.Storage.Container.list_stream(prefix: "app-")
+        |> Enum.map(& &1.name)
+  """
+  @spec list_stream(Client.t(), keyword()) :: Enumerable.t()
+  def list_stream(client, opts \\ []) do
+    Operation.page_stream(
+      &list_page(client, Keyword.put(opts, :marker, &1)),
+      AzureSDK.Storage.Container.StreamError
+    )
+  end
+
+  @doc """
+  Lists all blobs in a container (eager).
+
+  Accepts the same options as `list_blobs_page/3`. `:max_results` is the page
+  size, not a limit on the total; `:marker` is managed internally.
+
+  ## Parameters
+
+  * `client` - `AzureSDK.Storage.Client`
+  * `container` - container name
+  * `opts` - optional keyword list (default `[]`)
 
   ## Examples
 
       {:ok, blobs} = AzureSDK.Storage.Container.list_blobs(client, "uploads")
+
+      {:ok, blobs} =
+        AzureSDK.Storage.Container.list_blobs(client, "uploads",
+          prefix: "logs/",
+          max_results: 200
+        )
   """
   @spec list_blobs(Client.t(), String.t(), keyword()) ::
           {:ok, [map()]} | {:error, AzureSDK.Error.t()}
-  def list_blobs(client, container, _opts \\ []) do
+  def list_blobs(client, container, opts \\ []) do
     Telemetry.emit_operation(:container, :list_blobs, %{container: container})
-    list_blobs_page(client, container, nil, [])
+
+    Operation.collect_pages(&list_blobs_page(client, container, Keyword.put(opts, :marker, &1)))
+  end
+
+  @doc """
+  Lists one page of blobs in a container.
+
+  ## Parameters
+
+  * `client` - `AzureSDK.Storage.Client`
+  * `container` - container name
+  * `opts` - optional keyword list (default `[]`)
+
+  ## Options
+
+  * `:marker` - continuation token
+  * `:max_results` - page size (the service caps it at 5,000)
+  * `:prefix` - blob name prefix filter
+
+  ## Examples
+
+      {:ok, %{items: blobs, marker: marker}} =
+        AzureSDK.Storage.Container.list_blobs_page(client, "uploads",
+          prefix: "2025/",
+          max_results: 100
+        )
+  """
+  @spec list_blobs_page(Client.t(), String.t(), keyword()) ::
+          {:ok, page()} | {:error, AzureSDK.Error.t()}
+  def list_blobs_page(client, container, opts \\ []) do
+    Telemetry.emit_operation(:container, :list_blobs_page, %{container: container})
+
+    with {:ok, response} <-
+           Operation.run(client,
+             method: :get,
+             path: Path.join([container]),
+             query: [{"restype", "container"}, {"comp", "list"} | optional_query(opts)],
+             operation: :list_blobs
+           ) do
+      page = ListBlobs.parse_page(response.body || "")
+      {:ok, %{items: page.items, marker: blank_to_nil(page.marker)}}
+    end
+  end
+
+  @doc """
+  Lazily streams blobs across pages.
+
+  Accepts the same options as `list_blobs_page/3`. Mid-stream failures raise
+  `AzureSDK.Storage.Container.StreamError`.
+
+  ## Parameters
+
+  * `client` - `AzureSDK.Storage.Client`
+  * `container` - container name
+  * `opts` - optional keyword list (default `[]`)
+
+  ## Examples
+
+      names =
+        client
+        |> AzureSDK.Storage.Container.list_blobs_stream("uploads", prefix: "logs/")
+        |> Enum.map(& &1.name)
+  """
+  @spec list_blobs_stream(Client.t(), String.t(), keyword()) :: Enumerable.t()
+  def list_blobs_stream(client, container, opts \\ []) do
+    Operation.page_stream(
+      &list_blobs_page(client, container, Keyword.put(opts, :marker, &1)),
+      AzureSDK.Storage.Container.StreamError
+    )
   end
 
   @doc """
   Returns whether the container exists.
 
-  Uses a HEAD request (`Get Container Properties`).
+  ## Parameters
+
+  * `client` - `AzureSDK.Storage.Client`
+  * `name` - container name
+  * `opts` - accepted for API symmetry; currently unused (default `[]`)
 
   ## Returns
 
-  * `true` - container exists
-  * `false` - Azure reported missing (HTTP 404 / `ContainerNotFound`)
-  * `{:error, %AzureSDK.Error{}}` - auth, network, or other failures
+  * `true` / `false` when the HEAD succeeds or reports not found
+  * `{:error, %AzureSDK.Error{}}` for other failures
 
   ## Examples
 
@@ -202,14 +341,15 @@ defmodule AzureSDK.Storage.Container do
   @doc """
   Returns container user metadata.
 
-  ## Returns
+  ## Parameters
 
-  * `{:ok, map()}`
-  * `{:error, %AzureSDK.Error{}}`
+  * `client` - `AzureSDK.Storage.Client`
+  * `name` - container name
+  * `opts` - accepted for API symmetry; currently unused (default `[]`)
 
   ## Examples
 
-      {:ok, meta} = AzureSDK.Storage.Container.metadata(client, "uploads")
+      {:ok, %{"env" => "dev"}} = AzureSDK.Storage.Container.metadata(client, "uploads")
   """
   @spec metadata(Client.t(), String.t(), keyword()) ::
           {:ok, map()} | {:error, AzureSDK.Error.t()}
@@ -222,77 +362,28 @@ defmodule AzureSDK.Storage.Container do
   end
 
   defp head_container(client, name, operation) do
-    request =
-      Request.new(
-        method: :head,
-        path: Path.join([name]),
-        query: [{"restype", "container"}],
-        headers: %{"x-ms-version" => client.api_version},
-        service: :blob,
-        operation: operation,
-        metadata: Client.signing_metadata(client)
-      )
-
-    Pipeline.run(Client.to_core_client(client), request)
+    Operation.run(client,
+      method: :head,
+      path: Path.join([name]),
+      query: [{"restype", "container"}],
+      operation: operation
+    )
   end
 
-  defp list_containers(client, marker, acc) do
-    request =
-      Request.new(
-        method: :get,
-        path: "/",
-        query: [{"comp", "list"} | marker_query(marker)],
-        headers: %{"x-ms-version" => client.api_version},
-        service: :blob,
-        operation: :list_containers,
-        metadata: Client.signing_metadata(client)
-      )
-
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
-      page = ListContainers.parse_page(response.body || "")
-      acc = acc ++ page.items
-
-      if page.marker in [nil, ""] do
-        {:ok, acc}
-      else
-        list_containers(client, page.marker, acc)
-      end
-    end
+  defp optional_query(opts) do
+    []
+    |> maybe_query("marker", Keyword.get(opts, :marker))
+    |> maybe_query("maxresults", Keyword.get(opts, :max_results))
+    |> maybe_query("prefix", Keyword.get(opts, :prefix))
   end
 
-  defp list_blobs_page(client, container, marker, acc) do
-    request =
-      Request.new(
-        method: :get,
-        path: Path.join([container]),
-        query: [{"restype", "container"}, {"comp", "list"} | marker_query(marker)],
-        headers: %{"x-ms-version" => client.api_version},
-        service: :blob,
-        operation: :list_blobs,
-        metadata: Client.signing_metadata(client)
-      )
+  defp maybe_query(query, _key, nil), do: query
+  defp maybe_query(query, _key, ""), do: query
+  defp maybe_query(query, key, value), do: query ++ [{key, to_string(value)}]
 
-    with {:ok, response} <- Pipeline.run(Client.to_core_client(client), request) do
-      page = ListBlobs.parse_page(response.body || "")
-      acc = acc ++ page.items
-
-      if page.marker in [nil, ""] do
-        {:ok, acc}
-      else
-        list_blobs_page(client, container, page.marker, acc)
-      end
-    end
-  end
-
-  defp marker_query(nil), do: []
-  defp marker_query(marker), do: [{"marker", marker}]
-
-  defp public_access_header(opts) do
-    case Keyword.get(opts, :public_access) do
-      nil -> %{}
-      level -> %{"x-ms-blob-public-access" => to_string(level)}
-    end
-  end
+  defp blank_to_nil(nil), do: nil
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(value), do: value
 
   defp container_from_response(name, response, opts) do
     %{
@@ -304,4 +395,28 @@ defmodule AzureSDK.Storage.Container do
       metadata: Keyword.get(opts, :metadata, %{})
     }
   end
+end
+
+defmodule AzureSDK.Storage.Container.StreamError do
+  @moduledoc """
+  Raised when a mid-stream list page fails inside `list_stream/2` or
+  `list_blobs_stream/3`.
+
+  ## Fields
+
+  * `:reason` - typically `%AzureSDK.Error{}` from a failed list page
+
+  ## Examples
+
+      try do
+        Enum.to_list(AzureSDK.Storage.Container.list_stream(client))
+      rescue
+        e in AzureSDK.Storage.Container.StreamError ->
+          e.reason
+      end
+  """
+  defexception [:reason]
+
+  @impl true
+  def message(%{reason: reason}), do: "container stream failed: #{inspect(reason)}"
 end

@@ -1,7 +1,7 @@
 defmodule AzureSDK.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.3.0"
   @source_url "https://github.com/thanos/azure_sdk"
 
   def project do
@@ -65,8 +65,11 @@ defmodule AzureSDK.MixProject do
     [
       maintainers: ["Thanos Vassilakis"],
       licenses: ["MIT"],
-      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md guides),
-      links: %{"GitHub" => @source_url}
+      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md SECURITY.md guides livebooks),
+      links: %{
+        "GitHub" => @source_url,
+        "Security" => "#{@source_url}/blob/main/SECURITY.md"
+      }
     ]
   end
 
@@ -84,7 +87,12 @@ defmodule AzureSDK.MixProject do
         "guides/building_sdk_pipelines_with_req.md",
         "guides/designing_cloud_sdks_on_the_beam.md",
         "guides/studying_the_azure_sdk_architecture.md",
-        "guides/management_plane_design.md"
+        "guides/management_plane_design.md",
+        "livebooks/getting_started.livemd",
+        "livebooks/blob_storage.livemd",
+        "livebooks/authentication.livemd",
+        "livebooks/streaming.livemd",
+        "livebooks/telemetry.livemd"
       ],
       groups_for_extras: [
         "Using Azure SDK": [
@@ -99,6 +107,13 @@ defmodule AzureSDK.MixProject do
           "guides/designing_cloud_sdks_on_the_beam.md",
           "guides/studying_the_azure_sdk_architecture.md",
           "guides/management_plane_design.md"
+        ],
+        Livebooks: [
+          "livebooks/getting_started.livemd",
+          "livebooks/blob_storage.livemd",
+          "livebooks/authentication.livemd",
+          "livebooks/streaming.livemd",
+          "livebooks/telemetry.livemd"
         ]
       ],
       groups_for_modules: [
