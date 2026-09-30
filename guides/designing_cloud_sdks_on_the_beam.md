@@ -59,7 +59,7 @@ Ship stubs on day one:
 
 ```elixir
 defmodule AzureSDK.Storage.Queue do
-  @moduledoc "Planned v0.3.0."
+  @moduledoc "Planned v0.4.0."
 end
 ```
 

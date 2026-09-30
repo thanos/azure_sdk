@@ -9,7 +9,7 @@
 - `%AzureSDK.Error{}` everywhere
 - Req/Finch instead of HTTPoison
 - Azurite-first CI
-- Explicit credentials; OAuth in v0.2.0
+- Explicit credentials; Entra / OAuth (v0.2.0+); production Blob streams and SAS generation (v0.3.0)
 
 See [`plans/azurex-review.md`](https://github.com/thanos/azure_sdk/blob/main/plans/azurex-review.md) for details.
 
@@ -18,7 +18,7 @@ See [`plans/azurex-review.md`](https://github.com/thanos/azure_sdk/blob/main/pla
 ```elixir
 # Remove: {:azurex, "~> 1.1"}
 # Add:
-{:azure_sdk, "~> 0.2.0"}
+{:azure_sdk, "~> 0.3.0"}
 ```
 
 ## Client Setup
@@ -38,14 +38,18 @@ Create client once at startup; pass to all operations.
 ## Operation Mapping
 
 | Azurex | AzureSDK |
-|--------|---------|
+|--------|----------|
 | `put_blob/4` | `Blob.upload/4` |
 | `get_blob/3` | `Blob.download/3` |
 | `delete_blob/3` | `Blob.delete/3` |
-| `list_blobs/2` | `Container.list_blobs/2` |
+| `list_blobs/2` | `Container.list_blobs/2` (also `list_blobs_page/3`, `list_blobs_stream/3`) |
 | `create_container/2` | `Container.create/2` |
 | `delete_container/2` | `Container.delete/2` |
-| `list_containers/1` | `Container.list/1` |
+| `list_containers/1` | `Container.list/1` (also `list_page/2`, `list_stream/2`) |
+| streaming upload | `Blob.upload_stream/5` (Put Block / Put Block List) |
+| streaming download | `Blob.download_stream/4` (HTTP Range) |
+| SAS generation | `AzureSDK.Storage.Sas` |
+| leases / conditions | `Blob.Lease`, `Storage.Conditions` |
 
 Returns structured maps, not raw HTTP:
 
@@ -64,6 +68,8 @@ case Blob.download(client, c, n) do
   {:error, %Error{} = e} -> {:error, e}
 end
 ```
+
+Streaming APIs may raise during enumeration: `Blob.StreamError` / `Container.StreamError`.
 
 ## Config Migration
 
@@ -95,9 +101,10 @@ Double-account signing handled automatically.
 
 | Feature | Status |
 |---------|--------|
-| SAS generation | `AzureSDK.Storage.Sas` |
-| Page blobs | Block blobs only |
-| Queue/Table | v0.4.0 / v0.5.0 |
+| Page / append blobs | Block blobs only |
+| Container leases | Blob leases only |
+| Queue / Table | v0.4.0 / v0.5.0 |
+| Management (ARM) | v0.6.0 |
 
 ## Incremental Strategy
 
@@ -111,3 +118,4 @@ Double-account signing handled automatically.
 
 - `guides/azure_for_elixir_developers.md`
 - [`livebooks/getting_started.livemd`](https://github.com/thanos/azure_sdk/blob/main/livebooks/getting_started.livemd)
+- [`CHANGELOG.md`](https://github.com/thanos/azure_sdk/blob/main/CHANGELOG.md)

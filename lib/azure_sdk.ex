@@ -39,7 +39,7 @@ defmodule AzureSDK do
 
   ## Returns
 
-  Version string from the application spec (for example `"0.2.0"`).
+  Version string from the application spec (for example `"0.3.0"`).
 
   ## Examples
 
