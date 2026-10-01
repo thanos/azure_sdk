@@ -1,0 +1,71 @@
+# Queue Storage with AzureSDK
+
+```elixir
+Mix.install([
+  # {:azure_sdk, path: Path.expand("..", __DIR__)},
+  {:azure_sdk, "~> 0.4.0"}
+])
+```
+
+## Overview
+
+Creates a queue against local Azurite (port 10001), enqueues a message, peeks,
+gets, and deletes it.
+
+Requires Azurite:
+
+```bash
+docker compose up -d
+```
+
+```elixir
+credential =
+  AzureSDK.Identity.SharedKeyCredential.new(
+    "devstoreaccount1",
+    "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+  )
+
+client =
+  AzureSDK.Storage.Client.new(
+    account: "devstoreaccount1",
+    credential: credential,
+    endpoint: "http://127.0.0.1:10001/devstoreaccount1"
+  )
+
+queue = "livebook-jobs"
+
+unless AzureSDK.Storage.Queue.exists?(client, queue) do
+  {:ok, _} = AzureSDK.Storage.Queue.create(client, queue)
+end
+
+:ok
+```
+
+## Put and get a message
+
+```elixir
+{:ok, [_]} = AzureSDK.Storage.Queue.Message.put(client, queue, "hello from livebook")
+
+{:ok, [peeked]} = AzureSDK.Storage.Queue.Message.peek(client, queue)
+peeked.content
+```
+
+```elixir
+{:ok, [msg]} =
+  AzureSDK.Storage.Queue.Message.get(client, queue, visibility_timeout: 30)
+
+{:ok, :deleted} =
+  AzureSDK.Storage.Queue.Message.delete(client, queue, msg.id,
+    pop_receipt: msg.pop_receipt
+  )
+
+msg.content
+```
+
+## Clean up
+
+```elixir
+{:ok, :cleared} = AzureSDK.Storage.Queue.clear_messages(client, queue)
+{:ok, :deleted} = AzureSDK.Storage.Queue.delete(client, queue)
+:ok
+```

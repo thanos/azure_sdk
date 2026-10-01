@@ -1,7 +1,7 @@
 defmodule AzureSDK.MixProject do
   use Mix.Project
 
-  @version "0.3.0"
+  @version "0.4.0"
   @source_url "https://github.com/thanos/azure_sdk"
 
   def project do
@@ -92,7 +92,8 @@ defmodule AzureSDK.MixProject do
         "livebooks/blob_storage.livemd",
         "livebooks/authentication.livemd",
         "livebooks/streaming.livemd",
-        "livebooks/telemetry.livemd"
+        "livebooks/telemetry.livemd",
+        "livebooks/queue_storage.livemd"
       ],
       groups_for_extras: [
         "Using Azure SDK": [
@@ -113,7 +114,8 @@ defmodule AzureSDK.MixProject do
           "livebooks/blob_storage.livemd",
           "livebooks/authentication.livemd",
           "livebooks/streaming.livemd",
-          "livebooks/telemetry.livemd"
+          "livebooks/telemetry.livemd",
+          "livebooks/queue_storage.livemd"
         ]
       ],
       groups_for_modules: [

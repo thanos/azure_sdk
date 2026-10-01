@@ -1,6 +1,6 @@
 defmodule AzureSDK.Storage.Operation do
   @moduledoc false
-  # Shared plumbing for Storage service modules: request building, blob paths,
+  # Shared plumbing for Storage service modules: request building, paths,
   # response headers, option validation, and paged listing.
 
   alias AzureSDK.Core.{Pipeline, Request, Response}
@@ -40,6 +40,31 @@ defmodule AzureSDK.Storage.Operation do
   end
 
   @doc """
+  URL path for a queue resource.
+  """
+  @spec queue_path(String.t()) :: String.t()
+  def queue_path(queue) when is_binary(queue) do
+    Path.join([queue])
+  end
+
+  @doc """
+  URL path for the messages resource of a queue.
+  """
+  @spec queue_messages_path(String.t()) :: String.t()
+  def queue_messages_path(queue) when is_binary(queue) do
+    Path.join([queue, "messages"])
+  end
+
+  @doc """
+  URL path for a single queue message.
+  """
+  @spec queue_message_path(String.t(), String.t()) :: String.t()
+  def queue_message_path(queue, message_id)
+      when is_binary(queue) and is_binary(message_id) do
+    Path.join([queue, "messages", message_id])
+  end
+
+  @doc """
   Reads a response header by name (response headers are lowercased).
   """
   @spec header(Response.t(), String.t()) :: String.t() | nil
@@ -53,6 +78,15 @@ defmodule AzureSDK.Storage.Operation do
   @spec put_present(map(), String.t(), term()) :: map()
   def put_present(map, _key, nil), do: map
   def put_present(map, key, value), do: Map.put(map, key, to_string(value))
+
+  @doc """
+  Appends optional query pairs, skipping `nil` and `""` values.
+  """
+  @spec maybe_query([{String.t(), String.t()}], String.t(), term()) ::
+          [{String.t(), String.t()}]
+  def maybe_query(query, _key, nil), do: query
+  def maybe_query(query, _key, ""), do: query
+  def maybe_query(query, key, value), do: query ++ [{key, to_string(value)}]
 
   @doc """
   Fetches required options, returning `InvalidArgument` when any is missing.

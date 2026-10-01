@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.4.0 - 2026-10-01
+
+### Added
+
+- `AzureSDK.Storage.Queue` — create, delete, exists?, metadata, set_metadata,
+  list / list_page / list_stream, clear_messages
+- `AzureSDK.Storage.Queue.Message` — put, get, peek, delete, update with Base64
+  message bodies
+- Put Message and Get Messages set `metadata.idempotent: false` so ambiguous
+  5xx / transport failures are not retried (Get Messages has visibility side effects)
+- Queue XML parsers (`ListQueues`, `QueueMessages`) and `Queue.StreamError`
+- Livebook `livebooks/queue_storage.livemd`
+
 ## v0.3.0 - 2026-09-30
 
 ### Breaking

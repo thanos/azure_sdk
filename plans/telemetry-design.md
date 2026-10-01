@@ -63,6 +63,24 @@ Before backoff sleep: `%{count: 1, delay_ms: int}`, metadata includes `attempt`.
 | `[:azure_sdk, :container, :exists]` | `exists?/2` | `name` |
 | `[:azure_sdk, :container, :metadata]` | `metadata/2` | `name` |
 
+### Queue Operations (`AzureSDK.Storage.Queue` / `Queue.Message`)
+
+| Event | Function | Metadata |
+|-------|----------|----------|
+| `[:azure_sdk, :queue, :create]` | `Queue.create/3` | `name` |
+| `[:azure_sdk, :queue, :delete]` | `Queue.delete/3` | `name` |
+| `[:azure_sdk, :queue, :exists]` | `Queue.exists?/3` | `name` |
+| `[:azure_sdk, :queue, :metadata]` | `Queue.metadata/3` | `name` |
+| `[:azure_sdk, :queue, :set_metadata]` | `Queue.set_metadata/4` | `name` |
+| `[:azure_sdk, :queue, :list]` | `Queue.list/2` | `%{}` |
+| `[:azure_sdk, :queue, :list_page]` | `Queue.list_page/2` | `%{}` |
+| `[:azure_sdk, :queue, :clear]` | `Queue.clear_messages/3` | `name` |
+| `[:azure_sdk, :queue, :put_message]` | `Message.put/4` | `name` |
+| `[:azure_sdk, :queue, :get_messages]` | `Message.get/3` | `name` |
+| `[:azure_sdk, :queue, :peek_messages]` | `Message.peek/3` | `name` |
+| `[:azure_sdk, :queue, :delete_message]` | `Message.delete/4` | `name` |
+| `[:azure_sdk, :queue, :update_message]` | `Message.update/4` | `name` |
+
 All operation events measure `%{count: 1}`.
 
 ## Event Flow Example
@@ -100,7 +118,6 @@ end, nil)
 
 | Event | Version |
 |-------|---------|
-| `[:azure_sdk, :queue, :*]` | v0.4.0 |
 | `[:azure_sdk, :management, :*]` | v0.6.0 |
 
 ## Related Documents
