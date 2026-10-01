@@ -48,11 +48,11 @@ defmodule AzureSDK.Core.Xml.ListContainers do
         %{
           name: item[:name],
           properties: %{
-            last_modified: blank_to_nil(item[:last_modified]),
-            etag: blank_to_nil(item[:etag]),
-            lease_status: blank_to_nil(item[:lease_status]),
-            lease_state: blank_to_nil(item[:lease_state]),
-            public_access: blank_to_nil(item[:public_access])
+            last_modified: Safe.blank_to_nil(item[:last_modified]),
+            etag: Safe.blank_to_nil(item[:etag]),
+            lease_status: Safe.blank_to_nil(item[:lease_status]),
+            lease_state: Safe.blank_to_nil(item[:lease_state]),
+            public_access: Safe.blank_to_nil(item[:public_access])
           }
         }
       end)
@@ -60,12 +60,8 @@ defmodule AzureSDK.Core.Xml.ListContainers do
     marker =
       xml
       |> xpath(~x"//NextMarker/text()"s)
-      |> blank_to_nil()
+      |> Safe.blank_to_nil()
 
     %{items: items, marker: marker}
   end
-
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(nil), do: nil
-  defp blank_to_nil(value), do: value
 end

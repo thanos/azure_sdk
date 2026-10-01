@@ -24,12 +24,13 @@ defmodule AzureSDK.AzuriteCase do
     AzureSDK.Storage.Client.new(
       account: @azurite_account,
       credential: credential,
-      endpoint: Keyword.get(opts, :endpoint, @azurite_endpoint)
+      endpoint: Keyword.get(opts, :endpoint, @azurite_endpoint),
+      service: Keyword.get(opts, :service, :blob)
     )
   end
 
-  def azurite_available? do
-    case :gen_tcp.connect(~c"127.0.0.1", 10_000, [:binary, active: false], 500) do
+  def azurite_available?(port \\ 10_000) do
+    case :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false], 500) do
       {:ok, socket} ->
         :gen_tcp.close(socket)
         true

@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.4.0 - 2026-10-01
+
+### Added
+
+- `AzureSDK.Storage.Queue`: create, delete, exists?, metadata, set_metadata,
+  properties (approximate message count), list / list_page / list_stream
+  (with `:include_metadata`), clear_messages
+- `AzureSDK.Storage.Queue.Message`: put, get, peek, delete, update.
+  - `:message_encoding` is `:base64` (default; Azure Functions and v11 SDKs)
+    or `:none` (plain text; v12 Python and .NET defaults). Text that is not
+    valid Base64 is reported as `InvalidMessageEncoding`, never guessed.
+  - `update/4` without `:content` changes only the visibility timeout and keeps
+    the message body.
+  - `put/4` returns `{:ok, message}` (id, pop receipt, times; no content).
+  - `delete/4` treats `404 MessageNotFound` as already deleted.
+  - Out-of-range counts, timeouts, TTLs and bodies over 64 KiB return
+    `InvalidArgument` without a request.
+- Put Message, Get Messages and Update Message set `metadata.idempotent: false`
+  so ambiguous 5xx / transport failures are not retried (Put would duplicate,
+  Get has visibility side effects, Update issues a new pop receipt)
+- `Queue.StreamError`
+- Livebook `livebooks/queue_storage.livemd`
+
 ## v0.3.0 - 2026-09-30
 
 ### Breaking

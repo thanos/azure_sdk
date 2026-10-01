@@ -58,8 +58,8 @@ Azurite (Azure), LocalStack (AWS), fake-gcs-server (GCP).
 Ship stubs on day one:
 
 ```elixir
-defmodule AzureSDK.Storage.Queue do
-  @moduledoc "Planned v0.4.0."
+defmodule AzureSDK.Storage.Table do
+  @moduledoc "Planned v0.5.0."
 end
 ```
 

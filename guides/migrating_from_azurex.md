@@ -9,7 +9,7 @@
 - `%AzureSDK.Error{}` everywhere
 - Req/Finch instead of HTTPoison
 - Azurite-first CI
-- Explicit credentials; Entra / OAuth (v0.2.0+); production Blob streams and SAS generation (v0.3.0)
+- Explicit credentials; Entra / OAuth (v0.2.0+); Blob streams and SAS (v0.3.0); Queue Storage (v0.4.0)
 
 See [`plans/azurex-review.md`](https://github.com/thanos/azure_sdk/blob/main/plans/azurex-review.md) for details.
 
@@ -18,7 +18,7 @@ See [`plans/azurex-review.md`](https://github.com/thanos/azure_sdk/blob/main/pla
 ```elixir
 # Remove: {:azurex, "~> 1.1"}
 # Add:
-{:azure_sdk, "~> 0.3.0"}
+{:azure_sdk, "~> 0.4.0"}
 ```
 
 ## Client Setup
@@ -50,6 +50,7 @@ Create client once at startup; pass to all operations.
 | streaming download | `Blob.download_stream/4` (HTTP Range) |
 | SAS generation | `AzureSDK.Storage.Sas` |
 | leases / conditions | `Blob.Lease`, `Storage.Conditions` |
+| Queue CRUD / messages | `AzureSDK.Storage.Queue`, `Queue.Message` |
 
 Returns structured maps, not raw HTTP:
 
@@ -103,7 +104,8 @@ Double-account signing handled automatically.
 |---------|--------|
 | Page / append blobs | Block blobs only |
 | Container leases | Blob leases only |
-| Queue / Table | v0.4.0 / v0.5.0 |
+| Queue service SAS | Blob/container SAS only |
+| Table | v0.5.0 |
 | Management (ARM) | v0.6.0 |
 
 ## Incremental Strategy

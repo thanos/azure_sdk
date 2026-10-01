@@ -349,4 +349,138 @@ defmodule AzureSDK.AzureMock do
       Plug.Conn.resp(conn, 200, body)
     end)
   end
+
+  def stub_put_queue(bypass, queue, status \\ 201) do
+    Bypass.expect(bypass, "PUT", path([queue]), fn conn ->
+      conn
+      |> Plug.Conn.put_resp_header("etag", "\"0x1\"")
+      |> Plug.Conn.resp(status, "")
+    end)
+  end
+
+  def stub_delete_queue(bypass, queue, status \\ 204) do
+    Bypass.expect(bypass, "DELETE", path([queue]), fn conn ->
+      Plug.Conn.resp(conn, status, "")
+    end)
+  end
+
+  def stub_queue_metadata(bypass, queue, metadata \\ %{}) do
+    Bypass.expect(bypass, "GET", path([queue]), fn conn ->
+      conn =
+        Enum.reduce(metadata, conn, fn {k, v}, c ->
+          Plug.Conn.put_resp_header(c, "x-ms-meta-#{k}", to_string(v))
+        end)
+
+      conn
+      |> Plug.Conn.put_resp_header("x-ms-approximate-messages-count", "0")
+      |> Plug.Conn.resp(200, "")
+    end)
+  end
+
+  def stub_put_queue_metadata(bypass, queue, status \\ 204) do
+    Bypass.expect(bypass, "PUT", path([queue]), fn conn ->
+      Plug.Conn.resp(conn, status, "")
+    end)
+  end
+
+  # `queues` is a list of names or `{name, metadata}` pairs. Metadata is only
+  # included when the request asks for it (include=metadata), like the service.
+  def stub_list_queues(bypass, queues \\ ["jobs"]) do
+    Bypass.expect(bypass, "GET", path([]), fn conn ->
+      conn = Plug.Conn.fetch_query_params(conn)
+      include? = conn.query_params["include"] == "metadata"
+      Plug.Conn.resp(conn, 200, list_queues_xml(queues, nil, include?))
+    end)
+  end
+
+  @doc """
+  Builds a List Queues response page.
+  """
+  def list_queues_xml(queues, marker, include_metadata? \\ false) do
+    entries =
+      Enum.map_join(queues, "", fn
+        {name, metadata} -> queue_entry(name, metadata, include_metadata?)
+        name -> queue_entry(name, %{}, include_metadata?)
+      end)
+
+    """
+    <?xml version="1.0" encoding="utf-8"?>
+    <EnumerationResults>
+      <Queues>#{entries}</Queues>
+      <NextMarker>#{marker}</NextMarker>
+    </EnumerationResults>
+    """
+  end
+
+  defp queue_entry(name, metadata, true) do
+    meta = Enum.map_join(metadata, "", fn {k, v} -> "<#{k}>#{v}</#{k}>" end)
+    "<Queue><Name>#{name}</Name><Metadata>#{meta}</Metadata></Queue>"
+  end
+
+  defp queue_entry(name, _metadata, false), do: "<Queue><Name>#{name}</Name></Queue>"
+
+  def stub_clear_messages(bypass, queue, status \\ 204) do
+    Bypass.expect(bypass, "DELETE", path([queue, "messages"]), fn conn ->
+      Plug.Conn.resp(conn, status, "")
+    end)
+  end
+
+  # The real Put Message response carries the new message's id, pop receipt and
+  # times but no MessageText.
+  def stub_put_message(bypass, queue) do
+    body = """
+    <?xml version="1.0" encoding="utf-8"?>
+    <QueueMessagesList>
+      <QueueMessage>
+        <MessageId>msg-1</MessageId>
+        <InsertionTime>Wed, 01 Jan 2025 00:00:00 GMT</InsertionTime>
+        <ExpirationTime>Thu, 01 Jan 2026 00:00:00 GMT</ExpirationTime>
+        <PopReceipt>pr-1</PopReceipt>
+        <TimeNextVisible>Wed, 01 Jan 2025 00:00:00 GMT</TimeNextVisible>
+      </QueueMessage>
+    </QueueMessagesList>
+    """
+
+    Bypass.expect(bypass, "POST", path([queue, "messages"]), fn conn ->
+      Plug.Conn.resp(conn, 201, body)
+    end)
+  end
+
+  def stub_get_messages(bypass, queue, content \\ "hello") do
+    encoded = Base.encode64(content)
+
+    body = """
+    <?xml version="1.0" encoding="utf-8"?>
+    <QueueMessagesList>
+      <QueueMessage>
+        <MessageId>msg-1</MessageId>
+        <InsertionTime>Wed, 01 Jan 2025 00:00:00 GMT</InsertionTime>
+        <ExpirationTime>Thu, 01 Jan 2026 00:00:00 GMT</ExpirationTime>
+        <PopReceipt>pr-1</PopReceipt>
+        <TimeNextVisible>Wed, 01 Jan 2025 00:01:00 GMT</TimeNextVisible>
+        <DequeueCount>1</DequeueCount>
+        <MessageText>#{encoded}</MessageText>
+      </QueueMessage>
+    </QueueMessagesList>
+    """
+
+    Bypass.expect(bypass, "GET", path([queue, "messages"]), fn conn ->
+      Plug.Conn.resp(conn, 200, body)
+    end)
+  end
+
+  def stub_delete_message(bypass, queue, message_id, status \\ 204) do
+    Bypass.expect(bypass, "DELETE", path([queue, "messages", message_id]), fn conn ->
+      Plug.Conn.resp(conn, status, "")
+    end)
+  end
+
+  def stub_update_message(bypass, queue, message_id, status \\ 204) do
+    Bypass.expect(bypass, "PUT", path([queue, "messages", message_id]), fn conn ->
+      conn
+      |> Plug.Conn.put_resp_header("x-ms-popreceipt", "pr-2")
+      |> Plug.Conn.put_resp_header("x-ms-time-next-visible", "Wed, 01 Jan 2025 00:02:00 GMT")
+      |> Plug.Conn.resp(status, "")
+    end)
+  end
 end

@@ -3,7 +3,7 @@
 ```elixir
 Mix.install([
   # {:azure_sdk, path: Path.expand("..", __DIR__)},
-  {:azure_sdk, "~> 0.3.0"},
+  {:azure_sdk, "~> 0.4.0"},
 ])
 ```
 
@@ -50,8 +50,10 @@ client =
 ```elixir
 container = "livebook-demo"
 
-unless AzureSDK.Storage.Container.exists?(client, container) do
-  {:ok, _} = AzureSDK.Storage.Container.create(client, container)
+case AzureSDK.Storage.Container.exists?(client, container) do
+  true -> :ok
+  false -> {:ok, _} = AzureSDK.Storage.Container.create(client, container)
+  {:error, error} -> raise "Azurite Blob is not reachable: #{error.message}"
 end
 
 {:ok, blob} =

@@ -3,7 +3,7 @@
 ```elixir
 Mix.install([
   # {:azure_sdk, path: Path.expand("..", __DIR__)},
-  {:azure_sdk, "~> 0.3.0"},
+  {:azure_sdk, "~> 0.4.0"}
 ])
 ```
 
@@ -12,7 +12,13 @@ Mix.install([
 `upload_stream/5` stages Put Block chunks (default 4 MiB) and commits with Put
 Block List. `download_stream/4` fetches the blob with HTTP Range requests.
 
-Requires Azurite (`docker compose up -d`).
+Requires Azurite (`docker compose up -d`). If Blob calls return HTTP 500, the
+Azurite data volume is usually corrupted: recreate it with
+`docker compose down -v && docker compose up -d`. If Docker itself reports
+overlay I/O errors, restart Docker Desktop, then recreate the volume. As a
+workaround you can run
+`npx azurite --location /tmp/azurite-ex-azure --blobHost 127.0.0.1`
+on ports 10000–10002.
 
 ```elixir
 credential =
@@ -30,11 +36,11 @@ client =
 
 container = "stream-demo"
 
-unless AzureSDK.Storage.Container.exists?(client, container) do
-  {:ok, _} = AzureSDK.Storage.Container.create(client, container)
+case AzureSDK.Storage.Container.exists?(client, container) do
+  true -> :ok
+  false -> {:ok, _} = AzureSDK.Storage.Container.create(client, container)
+  {:error, error} -> raise "Azurite Blob is not reachable: #{error.message}"
 end
-
-:ok
 ```
 
 ## Stream upload
@@ -42,12 +48,22 @@ end
 ```elixir
 stream = Stream.repeatedly(fn -> "chunk-data-" end) |> Stream.take(20)
 
-{:ok, _} =
-  AzureSDK.Storage.Blob.upload_stream(client, container, "chunks.bin", stream,
-    block_size: 32
-  )
+case AzureSDK.Storage.Blob.upload_stream(client, container, "chunks.bin", stream,
+       block_size: 32
+     ) do
+  {:ok, _} ->
+    :ok
 
-:ok
+  {:error, %{status: 500} = error} ->
+    raise """
+    Azurite returned HTTP 500 (#{error.message}). Recreate its data volume \
+    (docker compose down -v && docker compose up -d) or run a temporary \
+    npx azurite on ports 10000-10002.
+    """
+
+  {:error, error} ->
+    raise "upload_stream failed: #{inspect(error)}"
+end
 ```
 
 ## Stream download

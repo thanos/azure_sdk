@@ -1,28 +1,26 @@
-# Release Plan - v0.3.0
+# Release Plan - v0.4.0
 
-Deliverables and release process for AzureSDK v0.3.0 Production Blob.
+Deliverables and release process for AzureSDK v0.4.0 Queue Storage.
 
 ## Scope
 
-### Production Blob (done)
+### Queue Storage (done)
 
-- Bounded-memory `upload_stream` (Put Block / Put Block List, random block-ID prefix)
-- Range `download_stream` with ETag pinning; optional `:range` on `download/4`
-- `Storage.Conditions` and `Blob.Lease`
-- Lazy listing: `list_page` / `list_stream` / `list_blobs_page` / `list_blobs_stream`
-- `Storage.Sas` Shared Key + user-delegation generation
+- `Storage.Queue` CRUD, metadata, properties, clear, list_page / list_stream (`:include_metadata`)
+- `Storage.Queue.Message` put / get / peek / delete / update with `:message_encoding` (`:base64` or `:none`)
+- Put Message, Get Messages and Update Message: `metadata.idempotent: false`
+- Azurite Queue port 10001 + Bypass retry proofs
 
 ### Documentation (done)
 
-- CHANGELOG (Breaking / Changed / Added), README roadmap, azurex review
-- Livebooks on Hexdocs extras; package includes `livebooks/` and `SECURITY.md`
-- `baoulo/RELEASE_NOTE-v0.3.0.md`, `baoulo/RELEASE_NOTICE-v0.3.0.md`
+- CHANGELOG, README roadmap, azurex review, telemetry catalog
+- Livebook `queue_storage.livemd` on Hexdocs extras
+- Release note and announcement text (maintained outside the repository)
 
-### Quality (done)
+### Quality
 
-- Unit + doctests, Azurite streaming/lease/SAS coverage where applicable
-- Credo, Doctor, Dialyzer, Sobelow
-- CI matrix Elixir 1.17–1.20 / OTP 27–29; Coveralls on supported cover job
+- Unit + doctests, Azurite when healthy, Credo, Doctor, Dialyzer, Sobelow
+- CI matrix Elixir 1.17–1.20 / OTP 27–29
 
 ## Release process
 
@@ -34,21 +32,18 @@ mix docs --warnings-as-errors
 mix hex.build
 
 # after merge to main
-git tag -a v0.3.0 -m "v0.3.0 Production Blob"
-git push origin v0.3.0
+git tag -a v0.4.0 -m "v0.4.0 Queue Storage"
+git push origin v0.4.0
 mix hex.publish
 ```
 
-Then create the GitHub Release from the tag (paste `baoulo/RELEASE_NOTE-v0.3.0.md`) and post the Reddit notice from `baoulo/RELEASE_NOTICE-v0.3.0.md`.
+Then create the GitHub Release from the tag with the release note, and post the announcement.
 
 ## Hotfix
 
-Branch from `v0.3.0`, patch, release `0.3.x`, cherry-pick to main.
+Branch from `v0.4.0`, patch, release `0.4.x`, cherry-pick to main.
 
 ## Related
 
 - `README.md#roadmap`
 - `CHANGELOG.md`
-- `baoulo/reviews/v0.3.0-review.md`
-- `baoulo/RELEASE_NOTE-v0.3.0.md`
-- `baoulo/RELEASE_NOTICE-v0.3.0.md`

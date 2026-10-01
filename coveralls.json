@@ -8,7 +8,6 @@
     "lib/azure_sdk/management/",
     "lib/azure_sdk/storage/data_lake.ex",
     "lib/azure_sdk/storage/file_share.ex",
-    "lib/azure_sdk/storage/queue.ex",
     "lib/azure_sdk/storage/table.ex",
     "lib/azure_sdk/identity/client_secret_credential.ex",
     "lib/azure_sdk/identity/default_azure_credential.ex",

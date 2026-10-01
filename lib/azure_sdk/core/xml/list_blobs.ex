@@ -49,11 +49,11 @@ defmodule AzureSDK.Core.Xml.ListBlobs do
         %{
           name: item[:name],
           properties: %{
-            content_type: blank_to_nil(item[:content_type]),
+            content_type: Safe.blank_to_nil(item[:content_type]),
             content_length: parse_integer(item[:content_length]),
-            etag: blank_to_nil(item[:etag]),
-            last_modified: blank_to_nil(item[:last_modified]),
-            blob_type: blank_to_nil(item[:blob_type])
+            etag: Safe.blank_to_nil(item[:etag]),
+            last_modified: Safe.blank_to_nil(item[:last_modified]),
+            blob_type: Safe.blank_to_nil(item[:blob_type])
           },
           metadata: %{}
         }
@@ -62,14 +62,10 @@ defmodule AzureSDK.Core.Xml.ListBlobs do
     marker =
       xml
       |> xpath(~x"//NextMarker/text()"s)
-      |> blank_to_nil()
+      |> Safe.blank_to_nil()
 
     %{items: items, marker: marker}
   end
-
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(nil), do: nil
-  defp blank_to_nil(value), do: value
 
   defp parse_integer(nil), do: nil
   defp parse_integer(""), do: nil

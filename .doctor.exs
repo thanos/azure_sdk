@@ -17,7 +17,6 @@
     AzureSDK.Management.StorageAccount,
     AzureSDK.Storage.DataLake,
     AzureSDK.Storage.FileShare,
-    AzureSDK.Storage.Queue,
     AzureSDK.Storage.Table
   ]
 }
