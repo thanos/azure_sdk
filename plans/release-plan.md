@@ -6,16 +6,16 @@ Deliverables and release process for AzureSDK v0.4.0 Queue Storage.
 
 ### Queue Storage (done)
 
-- `Storage.Queue` CRUD, metadata, clear, list_page / list_stream
-- `Storage.Queue.Message` put / get / peek / delete / update (Base64 bodies)
-- Put Message and Get Messages: `metadata.idempotent: false`
+- `Storage.Queue` CRUD, metadata, properties, clear, list_page / list_stream (`:include_metadata`)
+- `Storage.Queue.Message` put / get / peek / delete / update with `:message_encoding` (`:base64` or `:none`)
+- Put Message, Get Messages and Update Message: `metadata.idempotent: false`
 - Azurite Queue port 10001 + Bypass retry proofs
 
 ### Documentation (done)
 
 - CHANGELOG, README roadmap, azurex review, telemetry catalog
 - Livebook `queue_storage.livemd` on Hexdocs extras
-- `baoulo/RELEASE_NOTE-v0.4.0.md`, `baoulo/RELEASE_NOTICE-v0.4.0.md`
+- Release note and announcement text (maintained outside the repository)
 
 ### Quality
 
@@ -37,7 +37,7 @@ git push origin v0.4.0
 mix hex.publish
 ```
 
-Then create the GitHub Release from the tag (paste `baoulo/RELEASE_NOTE-v0.4.0.md`) and post the Reddit notice from `baoulo/RELEASE_NOTICE-v0.4.0.md`.
+Then create the GitHub Release from the tag with the release note, and post the announcement.
 
 ## Hotfix
 
@@ -47,5 +47,3 @@ Branch from `v0.4.0`, patch, release `0.4.x`, cherry-pick to main.
 
 - `README.md#roadmap`
 - `CHANGELOG.md`
-- `baoulo/RELEASE_NOTE-v0.4.0.md`
-- `baoulo/RELEASE_NOTICE-v0.4.0.md`

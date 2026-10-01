@@ -10,7 +10,7 @@ Mix.install([
 ## Overview
 
 Creates a queue against local Azurite (port 10001), enqueues a message, peeks,
-gets, and deletes it.
+gets, extends its visibility, and deletes it.
 
 Requires Azurite:
 
@@ -34,17 +34,17 @@ client =
 
 queue = "livebook-jobs"
 
-unless AzureSDK.Storage.Queue.exists?(client, queue) do
-  {:ok, _} = AzureSDK.Storage.Queue.create(client, queue)
+case AzureSDK.Storage.Queue.exists?(client, queue) do
+  true -> :ok
+  false -> {:ok, _} = AzureSDK.Storage.Queue.create(client, queue)
+  {:error, error} -> raise "Azurite Queue is not reachable: #{error.message}"
 end
-
-:ok
 ```
 
 ## Put and get a message
 
 ```elixir
-{:ok, [_]} = AzureSDK.Storage.Queue.Message.put(client, queue, "hello from livebook")
+{:ok, %{id: _id}} = AzureSDK.Storage.Queue.Message.put(client, queue, "hello from livebook")
 
 {:ok, [peeked]} = AzureSDK.Storage.Queue.Message.peek(client, queue)
 peeked.content
@@ -54,12 +54,36 @@ peeked.content
 {:ok, [msg]} =
   AzureSDK.Storage.Queue.Message.get(client, queue, visibility_timeout: 30)
 
+# Need more time? Extend visibility; the body is kept.
+{:ok, msg} =
+  AzureSDK.Storage.Queue.Message.update(client, queue, msg.id,
+    pop_receipt: msg.pop_receipt,
+    visibility_timeout: 60
+  )
+
 {:ok, :deleted} =
   AzureSDK.Storage.Queue.Message.delete(client, queue, msg.id,
     pop_receipt: msg.pop_receipt
   )
 
-msg.content
+msg.id
+```
+
+## Plain-text messages
+
+Producers on the v12 Python or .NET SDKs send plain text by default. Read and
+write those queues with `message_encoding: :none`:
+
+```elixir
+{:ok, _} =
+  AzureSDK.Storage.Queue.Message.put(client, queue, ~s({"job": 1}), message_encoding: :none)
+
+{:ok, [plain]} = AzureSDK.Storage.Queue.Message.get(client, queue, message_encoding: :none)
+
+{:ok, :deleted} =
+  AzureSDK.Storage.Queue.Message.delete(client, queue, plain.id, pop_receipt: plain.pop_receipt)
+
+plain.content
 ```
 
 ## Clean up

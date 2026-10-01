@@ -175,11 +175,11 @@ defmodule AzureSDK.Storage.Container do
            Operation.run(client,
              method: :get,
              path: "/",
-             query: [{"comp", "list"} | optional_query(opts)],
+             query: [{"comp", "list"} | Operation.list_query(opts)],
              operation: :list_containers
            ) do
       page = ListContainers.parse_page(response.body || "")
-      {:ok, %{items: page.items, marker: blank_to_nil(page.marker)}}
+      {:ok, %{items: page.items, marker: Operation.blank_to_nil(page.marker)}}
     end
   end
 
@@ -271,11 +271,11 @@ defmodule AzureSDK.Storage.Container do
            Operation.run(client,
              method: :get,
              path: Path.join([container]),
-             query: [{"restype", "container"}, {"comp", "list"} | optional_query(opts)],
+             query: [{"restype", "container"}, {"comp", "list"} | Operation.list_query(opts)],
              operation: :list_blobs
            ) do
       page = ListBlobs.parse_page(response.body || "")
-      {:ok, %{items: page.items, marker: blank_to_nil(page.marker)}}
+      {:ok, %{items: page.items, marker: Operation.blank_to_nil(page.marker)}}
     end
   end
 
@@ -369,21 +369,6 @@ defmodule AzureSDK.Storage.Container do
       operation: operation
     )
   end
-
-  defp optional_query(opts) do
-    []
-    |> maybe_query("marker", Keyword.get(opts, :marker))
-    |> maybe_query("maxresults", Keyword.get(opts, :max_results))
-    |> maybe_query("prefix", Keyword.get(opts, :prefix))
-  end
-
-  defp maybe_query(query, _key, nil), do: query
-  defp maybe_query(query, _key, ""), do: query
-  defp maybe_query(query, key, value), do: query ++ [{key, to_string(value)}]
-
-  defp blank_to_nil(nil), do: nil
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(value), do: value
 
   defp container_from_response(name, response, opts) do
     %{

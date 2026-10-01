@@ -383,23 +383,41 @@ defmodule AzureSDK.AzureMock do
     end)
   end
 
+  # `queues` is a list of names or `{name, metadata}` pairs. Metadata is only
+  # included when the request asks for it (include=metadata), like the service.
   def stub_list_queues(bypass, queues \\ ["jobs"]) do
+    Bypass.expect(bypass, "GET", path([]), fn conn ->
+      conn = Plug.Conn.fetch_query_params(conn)
+      include? = conn.query_params["include"] == "metadata"
+      Plug.Conn.resp(conn, 200, list_queues_xml(queues, nil, include?))
+    end)
+  end
+
+  @doc """
+  Builds a List Queues response page.
+  """
+  def list_queues_xml(queues, marker, include_metadata? \\ false) do
     entries =
-      Enum.map_join(queues, "", fn name ->
-        "<Queue><Name>#{name}</Name></Queue>"
+      Enum.map_join(queues, "", fn
+        {name, metadata} -> queue_entry(name, metadata, include_metadata?)
+        name -> queue_entry(name, %{}, include_metadata?)
       end)
 
-    body = """
+    """
     <?xml version="1.0" encoding="utf-8"?>
     <EnumerationResults>
       <Queues>#{entries}</Queues>
+      <NextMarker>#{marker}</NextMarker>
     </EnumerationResults>
     """
-
-    Bypass.expect(bypass, "GET", path([]), fn conn ->
-      Plug.Conn.resp(conn, 200, body)
-    end)
   end
+
+  defp queue_entry(name, metadata, true) do
+    meta = Enum.map_join(metadata, "", fn {k, v} -> "<#{k}>#{v}</#{k}>" end)
+    "<Queue><Name>#{name}</Name><Metadata>#{meta}</Metadata></Queue>"
+  end
+
+  defp queue_entry(name, _metadata, false), do: "<Queue><Name>#{name}</Name></Queue>"
 
   def stub_clear_messages(bypass, queue, status \\ 204) do
     Bypass.expect(bypass, "DELETE", path([queue, "messages"]), fn conn ->
@@ -407,9 +425,9 @@ defmodule AzureSDK.AzureMock do
     end)
   end
 
-  def stub_put_message(bypass, queue, content \\ "hello") do
-    encoded = Base.encode64(content)
-
+  # The real Put Message response carries the new message's id, pop receipt and
+  # times but no MessageText.
+  def stub_put_message(bypass, queue) do
     body = """
     <?xml version="1.0" encoding="utf-8"?>
     <QueueMessagesList>
@@ -419,7 +437,6 @@ defmodule AzureSDK.AzureMock do
         <ExpirationTime>Thu, 01 Jan 2026 00:00:00 GMT</ExpirationTime>
         <PopReceipt>pr-1</PopReceipt>
         <TimeNextVisible>Wed, 01 Jan 2025 00:00:00 GMT</TimeNextVisible>
-        <MessageText>#{encoded}</MessageText>
       </QueueMessage>
     </QueueMessagesList>
     """

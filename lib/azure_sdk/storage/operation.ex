@@ -89,6 +89,24 @@ defmodule AzureSDK.Storage.Operation do
   def maybe_query(query, key, value), do: query ++ [{key, to_string(value)}]
 
   @doc """
+  Query pairs for the `:marker`, `:max_results` and `:prefix` list options.
+  """
+  @spec list_query(keyword()) :: [{String.t(), String.t()}]
+  def list_query(opts) do
+    []
+    |> maybe_query("marker", Keyword.get(opts, :marker))
+    |> maybe_query("maxresults", Keyword.get(opts, :max_results))
+    |> maybe_query("prefix", Keyword.get(opts, :prefix))
+  end
+
+  @doc """
+  `nil` for `nil` or `""`, otherwise the value.
+  """
+  @spec blank_to_nil(String.t() | nil) :: String.t() | nil
+  def blank_to_nil(value) when value in [nil, ""], do: nil
+  def blank_to_nil(value), do: value
+
+  @doc """
   Fetches required options, returning `InvalidArgument` when any is missing.
   """
   @spec require_opts(keyword(), [atom()], atom()) :: {:ok, map()} | {:error, Error.t()}

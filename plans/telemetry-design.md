@@ -71,6 +71,7 @@ Before backoff sleep: `%{count: 1, delay_ms: int}`, metadata includes `attempt`.
 | `[:azure_sdk, :queue, :delete]` | `Queue.delete/3` | `name` |
 | `[:azure_sdk, :queue, :exists]` | `Queue.exists?/3` | `name` |
 | `[:azure_sdk, :queue, :metadata]` | `Queue.metadata/3` | `name` |
+| `[:azure_sdk, :queue, :properties]` | `Queue.properties/3` | `name` |
 | `[:azure_sdk, :queue, :set_metadata]` | `Queue.set_metadata/4` | `name` |
 | `[:azure_sdk, :queue, :list]` | `Queue.list/2` | `%{}` |
 | `[:azure_sdk, :queue, :list_page]` | `Queue.list_page/2` | `%{}` |

@@ -8,4 +8,10 @@ defmodule AzureSDK.Core.Xml.Safe do
   catch
     :exit, _ -> {:error, :invalid_xml}
   end
+
+  @doc false
+  # XPath string results are "" when a node is missing; callers want nil.
+  @spec blank_to_nil(String.t() | nil) :: String.t() | nil
+  def blank_to_nil(""), do: nil
+  def blank_to_nil(value), do: value
 end

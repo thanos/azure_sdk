@@ -10,7 +10,7 @@ Azure platform SDK for Elixir and Erlang.
 
 AzureSDK is not a Blob Storage library. It is a long-term, multi-service Azure SDK built on BEAM-native patterns: explicit client structs, OTP-ready design, first-class telemetry, and a reusable Req pipeline.
 
-**v0.4.0** adds Azure Queue Storage: queue CRUD, message put/get/peek/delete/update, and non-idempotent retry for Put Message and Get Messages. Table, Management, and BEAM integrations follow later (see Roadmap).
+**v0.4.0** adds Azure Queue Storage: queue CRUD, message put/get/peek/delete/update, explicit Base64 or plain-text message encoding, and no automatic retry for the message operations that are unsafe to repeat. Table, Management, and BEAM integrations follow later (see Roadmap).
 
 See [CHANGELOG](CHANGELOG.md) for migration notes. Identity guide: [`guides/azure_identity.md`](guides/azure_identity.md).
 
@@ -54,13 +54,25 @@ queue_client =
   )
 
 {:ok, _} = AzureSDK.Storage.Queue.create(queue_client, "jobs")
-{:ok, [_msg]} = AzureSDK.Storage.Queue.Message.put(queue_client, "jobs", "hello")
+{:ok, %{id: _id}} = AzureSDK.Storage.Queue.Message.put(queue_client, "jobs", "hello")
 {:ok, [msg]} = AzureSDK.Storage.Queue.Message.get(queue_client, "jobs", visibility_timeout: 30)
+
+# Still working: extend visibility without touching the body
+{:ok, msg} =
+  AzureSDK.Storage.Queue.Message.update(queue_client, "jobs", msg.id,
+    pop_receipt: msg.pop_receipt,
+    visibility_timeout: 60
+  )
+
 {:ok, :deleted} =
   AzureSDK.Storage.Queue.Message.delete(queue_client, "jobs", msg.id,
     pop_receipt: msg.pop_receipt
   )
 ```
+
+Messages are Base64 by default (Azure Functions and v11 SDKs). For queues
+shared with the v12 Python or .NET SDKs, which send plain text by default, pass
+`message_encoding: :none` on both sides.
 
 ### Stream upload / download
 
@@ -129,7 +141,7 @@ v0.1.0 established the platform foundation. Releases after v0.2.0 deepen Storage
 - Queue create / delete / exists / metadata / clear
 - Lazy and eager listing (`list_page` / `list_stream`)
 - Messages: put, get, peek, delete, update
-- Put Message and Get Messages marked non-idempotent for retry safety
+- Put/Get/Update Message are never retried automatically; Base64 or plain-text message encoding
 
 ### v0.5.0 - Table Storage
 

@@ -9,13 +9,17 @@ defmodule AzureSDK.Storage.Queue do
 
       %{
         name: "jobs",
-        properties: %{approximate_message_count: "0"},
+        properties: %{etag: "\\"0x8D…\\"", last_modified: "Wed, 01 Jan 2025 00:00:00 GMT"},
         metadata: %{"env" => "dev"}
       }
 
   ## List page (`t:page/0`)
 
-      %{items: [%{name: "jobs", metadata: %{}}], marker: nil}
+  `metadata` is only filled when you list with `include_metadata: true`;
+  otherwise it is `nil`.
+
+      %{items: [%{name: "jobs", metadata: nil}], marker: nil}
+      %{items: [%{name: "jobs", metadata: %{"env" => "dev"}}], marker: "next"}
   """
 
   alias AzureSDK.Core.Telemetry
@@ -23,10 +27,10 @@ defmodule AzureSDK.Storage.Queue do
   alias AzureSDK.Storage.{Client, Metadata, Operation}
 
   @typedoc """
-  Queue result map.
+  Queue result map from `create/3`.
 
   * `:name` - queue name
-  * `:properties` - service properties when returned (for example approximate count)
+  * `:properties` - `etag` and `last_modified` when the service returns them
   * `:metadata` - user metadata without the `x-ms-meta-` prefix
   """
   @type queue :: %{
@@ -36,9 +40,20 @@ defmodule AzureSDK.Storage.Queue do
         }
 
   @typedoc """
+  Queue entry in a list page. `:metadata` is `nil` unless listed with
+  `include_metadata: true`.
+  """
+  @type list_item :: %{name: String.t(), metadata: map() | nil}
+
+  @typedoc """
   A single list page with continuation marker.
   """
-  @type page :: %{items: [map()], marker: String.t() | nil}
+  @type page :: %{items: [list_item()], marker: String.t() | nil}
+
+  @typedoc """
+  Result of `properties/3`.
+  """
+  @type properties :: %{approximate_message_count: non_neg_integer() | nil, metadata: map()}
 
   @doc """
   Creates a queue.
@@ -59,18 +74,24 @@ defmodule AzureSDK.Storage.Queue do
   def create(client, name, opts \\ []) do
     Telemetry.emit_operation(:queue, :create, %{name: name})
 
-    headers = Metadata.headers(Keyword.get(opts, :metadata, %{}))
-
     with {:ok, response} <-
            Operation.run(client,
              method: :put,
              path: Operation.queue_path(name),
-             headers: headers,
+             headers: Metadata.headers(Keyword.get(opts, :metadata, %{})),
              body: "",
              service: :queue,
              operation: :create
            ) do
-      {:ok, queue_from_response(name, response, opts)}
+      {:ok,
+       %{
+         name: name,
+         properties: %{
+           etag: Operation.header(response, "etag"),
+           last_modified: Operation.header(response, "last-modified")
+         },
+         metadata: Keyword.get(opts, :metadata, %{})
+       }}
     end
   end
 
@@ -100,16 +121,23 @@ defmodule AzureSDK.Storage.Queue do
   @doc """
   Returns whether the queue exists.
 
+  Returns `{:error, error}` for failures other than "not found", so match on
+  all three results rather than treating the return value as a boolean.
+
   ## Examples
 
-      true = AzureSDK.Storage.Queue.exists?(client, "jobs")
+      case AzureSDK.Storage.Queue.exists?(client, "jobs") do
+        true -> :ok
+        false -> AzureSDK.Storage.Queue.create(client, "jobs")
+        {:error, error} -> {:error, error}
+      end
   """
   @spec exists?(Client.t(), String.t(), keyword()) ::
           boolean() | {:error, AzureSDK.Error.t()}
   def exists?(client, name, _opts \\ []) do
     Telemetry.emit_operation(:queue, :exists, %{name: name})
 
-    case head_metadata(client, name, :exists) do
+    case get_metadata(client, name, :exists) do
       {:ok, _} -> true
       {:error, %{status: 404}} -> false
       {:error, %{code: "QueueNotFound"}} -> false
@@ -129,8 +157,39 @@ defmodule AzureSDK.Storage.Queue do
   def metadata(client, name, _opts \\ []) do
     Telemetry.emit_operation(:queue, :metadata, %{name: name})
 
-    with {:ok, response} <- head_metadata(client, name, :metadata) do
+    with {:ok, response} <- get_metadata(client, name, :metadata) do
       {:ok, Metadata.from_headers(response.headers)}
+    end
+  end
+
+  @doc """
+  Returns the approximate message count and user metadata.
+
+  The count is approximate: the service may include messages that are
+  invisible or about to expire.
+
+  ## Examples
+
+      {:ok, %{approximate_message_count: 3, metadata: %{}}} =
+        AzureSDK.Storage.Queue.properties(client, "jobs")
+  """
+  @spec properties(Client.t(), String.t(), keyword()) ::
+          {:ok, properties()} | {:error, AzureSDK.Error.t()}
+  def properties(client, name, _opts \\ []) do
+    Telemetry.emit_operation(:queue, :properties, %{name: name})
+
+    with {:ok, response} <- get_metadata(client, name, :properties) do
+      count =
+        case response
+             |> Operation.header("x-ms-approximate-messages-count")
+             |> to_string()
+             |> Integer.parse() do
+          {count, ""} -> count
+          _ -> nil
+        end
+
+      {:ok,
+       %{approximate_message_count: count, metadata: Metadata.from_headers(response.headers)}}
     end
   end
 
@@ -170,9 +229,11 @@ defmodule AzureSDK.Storage.Queue do
   ## Examples
 
       {:ok, queues} = AzureSDK.Storage.Queue.list(client)
-      {:ok, queues} = AzureSDK.Storage.Queue.list(client, prefix: "job-", max_results: 50)
+
+      {:ok, queues} =
+        AzureSDK.Storage.Queue.list(client, prefix: "job-", include_metadata: true)
   """
-  @spec list(Client.t(), keyword()) :: {:ok, [queue()]} | {:error, AzureSDK.Error.t()}
+  @spec list(Client.t(), keyword()) :: {:ok, [list_item()]} | {:error, AzureSDK.Error.t()}
   def list(client, opts \\ []) do
     Telemetry.emit_operation(:queue, :list, %{})
     Operation.collect_pages(&list_page(client, Keyword.put(opts, :marker, &1)))
@@ -184,8 +245,10 @@ defmodule AzureSDK.Storage.Queue do
   ## Options
 
   * `:marker` - continuation token
-  * `:max_results` - page size
+  * `:max_results` - page size (the service caps it at 5,000)
   * `:prefix` - name prefix filter
+  * `:include_metadata` - when `true`, each item's `:metadata` holds the queue's
+    user metadata (default `false`, which leaves `:metadata` as `nil`)
 
   ## Examples
 
@@ -195,12 +258,11 @@ defmodule AzureSDK.Storage.Queue do
   @spec list_page(Client.t(), keyword()) :: {:ok, page()} | {:error, AzureSDK.Error.t()}
   def list_page(client, opts \\ []) do
     Telemetry.emit_operation(:queue, :list_page, %{})
+    include_metadata? = Keyword.get(opts, :include_metadata, false)
 
     query =
-      [{"comp", "list"}]
-      |> Operation.maybe_query("marker", Keyword.get(opts, :marker))
-      |> Operation.maybe_query("maxresults", Keyword.get(opts, :max_results))
-      |> Operation.maybe_query("prefix", Keyword.get(opts, :prefix))
+      [{"comp", "list"} | Operation.list_query(opts)]
+      |> Operation.maybe_query("include", if(include_metadata?, do: "metadata"))
 
     with {:ok, response} <-
            Operation.run(client,
@@ -210,15 +272,16 @@ defmodule AzureSDK.Storage.Queue do
              service: :queue,
              operation: :list_page
            ) do
-      page = ListQueues.parse_page(response.body || "")
-      {:ok, %{items: page.items, marker: blank_to_nil(page.marker)}}
+      page = ListQueues.parse_page(response.body || "", include_metadata?)
+      {:ok, %{items: page.items, marker: page.marker}}
     end
   end
 
   @doc """
   Lazily streams queues across pages.
 
-  Mid-stream failures raise `AzureSDK.Storage.Queue.StreamError`.
+  Accepts the same options as `list_page/2`. Mid-stream failures raise
+  `AzureSDK.Storage.Queue.StreamError`.
 
   ## Examples
 
@@ -258,7 +321,7 @@ defmodule AzureSDK.Storage.Queue do
     end
   end
 
-  defp head_metadata(client, name, operation) do
+  defp get_metadata(client, name, operation) do
     Operation.run(client,
       method: :get,
       path: Operation.queue_path(name),
@@ -267,22 +330,6 @@ defmodule AzureSDK.Storage.Queue do
       operation: operation
     )
   end
-
-  defp queue_from_response(name, response, opts) do
-    %{
-      name: name,
-      properties: %{
-        etag: Operation.header(response, "etag"),
-        last_modified: Operation.header(response, "last-modified"),
-        approximate_message_count: Operation.header(response, "x-ms-approximate-messages-count")
-      },
-      metadata: Keyword.get(opts, :metadata, Metadata.from_headers(response.headers))
-    }
-  end
-
-  defp blank_to_nil(nil), do: nil
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(value), do: value
 end
 
 defmodule AzureSDK.Storage.Queue.StreamError do
@@ -292,6 +339,14 @@ defmodule AzureSDK.Storage.Queue.StreamError do
   ## Fields
 
   * `:reason` - typically `%AzureSDK.Error{}` from a failed list page
+
+  ## Examples
+
+      try do
+        Enum.to_list(AzureSDK.Storage.Queue.list_stream(client))
+      rescue
+        e in AzureSDK.Storage.Queue.StreamError -> e.reason
+      end
   """
   defexception [:reason]
 

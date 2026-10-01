@@ -36,13 +36,10 @@ defmodule AzureSDK.Core.Xml.Error do
 
       [error | _] ->
         %{
-          code: blank_to_nil(error[:code]),
-          message: blank_to_nil(error[:message]),
+          code: Safe.blank_to_nil(error[:code]),
+          message: Safe.blank_to_nil(error[:message]),
           details: Map.drop(error, [:code, :message])
         }
     end
   end
-
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(value), do: value
 end
