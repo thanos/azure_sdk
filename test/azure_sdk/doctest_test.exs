@@ -26,4 +26,9 @@ defmodule AzureSDK.DoctestTest do
   doctest AzureSDK.Storage.Conditions
   doctest AzureSDK.Storage.Blob.Block
   doctest AzureSDK.Storage.Sas
+  doctest AzureSDK.Storage.Queue
+  doctest AzureSDK.Storage.Queue.Message
+  doctest AzureSDK.Storage.Queue.StreamError
+  doctest AzureSDK.Core.Xml.ListQueues
+  doctest AzureSDK.Core.Xml.QueueMessages
 end

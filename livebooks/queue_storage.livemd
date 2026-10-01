@@ -10,7 +10,9 @@ Mix.install([
 ## Overview
 
 Creates a queue against local Azurite (port 10001), enqueues a message, peeks,
-gets, extends its visibility, and deletes it.
+gets, extends visibility without rewriting the body, and deletes it. A second
+section shows plain-text (`message_encoding: :none`) round-trips for queues
+shared with the v12 Python or .NET SDKs.
 
 Requires Azurite:
 
@@ -41,10 +43,11 @@ case AzureSDK.Storage.Queue.exists?(client, queue) do
 end
 ```
 
-## Put and get a message
+## Put, peek, get, update, delete
 
 ```elixir
-{:ok, %{id: _id}} = AzureSDK.Storage.Queue.Message.put(client, queue, "hello from livebook")
+{:ok, %{id: _id, content: nil}} =
+  AzureSDK.Storage.Queue.Message.put(client, queue, "hello from livebook")
 
 {:ok, [peeked]} = AzureSDK.Storage.Queue.Message.peek(client, queue)
 peeked.content
@@ -54,7 +57,7 @@ peeked.content
 {:ok, [msg]} =
   AzureSDK.Storage.Queue.Message.get(client, queue, visibility_timeout: 30)
 
-# Need more time? Extend visibility; the body is kept.
+# Extend visibility only; omit :content so the body is kept.
 {:ok, msg} =
   AzureSDK.Storage.Queue.Message.update(client, queue, msg.id,
     pop_receipt: msg.pop_receipt,
@@ -72,18 +75,36 @@ msg.id
 ## Plain-text messages
 
 Producers on the v12 Python or .NET SDKs send plain text by default. Read and
-write those queues with `message_encoding: :none`:
+write those queues with `message_encoding: :none` on every call that touches
+the body.
 
 ```elixir
 {:ok, _} =
-  AzureSDK.Storage.Queue.Message.put(client, queue, ~s({"job": 1}), message_encoding: :none)
+  AzureSDK.Storage.Queue.Message.put(client, queue, ~s({"job": 1}),
+    message_encoding: :none
+  )
 
-{:ok, [plain]} = AzureSDK.Storage.Queue.Message.get(client, queue, message_encoding: :none)
+{:ok, [plain]} =
+  AzureSDK.Storage.Queue.Message.get(client, queue, message_encoding: :none)
 
 {:ok, :deleted} =
-  AzureSDK.Storage.Queue.Message.delete(client, queue, plain.id, pop_receipt: plain.pop_receipt)
+  AzureSDK.Storage.Queue.Message.delete(client, queue, plain.id,
+    pop_receipt: plain.pop_receipt
+  )
 
 plain.content
+```
+
+## List and properties
+
+```elixir
+{:ok, %{approximate_message_count: _count}} =
+  AzureSDK.Storage.Queue.properties(client, queue)
+
+{:ok, queues} =
+  AzureSDK.Storage.Queue.list(client, prefix: "livebook-", include_metadata: true)
+
+Enum.map(queues, & &1.name)
 ```
 
 ## Clean up

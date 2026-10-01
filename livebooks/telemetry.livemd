@@ -66,8 +66,10 @@ client =
 
 container = "telemetry-demo"
 
-unless AzureSDK.Storage.Container.exists?(client, container) do
-  {:ok, _} = AzureSDK.Storage.Container.create(client, container)
+case AzureSDK.Storage.Container.exists?(client, container) do
+  true -> :ok
+  false -> {:ok, _} = AzureSDK.Storage.Container.create(client, container)
+  {:error, error} -> raise "Azurite Blob is not reachable: #{error.message}"
 end
 
 {:ok, _} = AzureSDK.Storage.Blob.upload(client, container, "metric.txt", "telemetry")

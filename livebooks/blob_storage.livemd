@@ -27,8 +27,14 @@ client =
 
 container = "blob-livebook"
 
-unless AzureSDK.Storage.Container.exists?(client, container) do
-  {:ok, _} = AzureSDK.Storage.Container.create(client, container, metadata: %{"demo" => "true"})
+case AzureSDK.Storage.Container.exists?(client, container) do
+  true -> :ok
+  false ->
+    {:ok, _} =
+      AzureSDK.Storage.Container.create(client, container, metadata: %{"demo" => "true"})
+
+  {:error, error} ->
+    raise "Azurite Blob is not reachable: #{error.message}"
 end
 
 true = AzureSDK.Storage.Container.exists?(client, container)

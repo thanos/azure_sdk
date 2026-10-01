@@ -1,5 +1,31 @@
 defmodule AzureSDK.Core.Xml.QueueMessages do
-  @moduledoc false
+  @moduledoc """
+  Parses and encodes Azure Queue Message XML.
+
+  Used by `AzureSDK.Storage.Queue.Message`. Prefer the Storage APIs unless you
+  are inspecting raw service responses.
+
+  ## Encoding (`t:encoding/0`)
+
+  * `:base64` - MessageText is Base64 of the raw bytes
+  * `:none` - MessageText is the UTF-8 text (XML-escaped on encode)
+
+  ## Message map (`t:message/0`)
+
+      %{
+        id: "msg-1",
+        pop_receipt: "pr-1",
+        insertion_time: "Wed, 01 Jan 2025 00:00:00 GMT",
+        expiration_time: "Wed, 08 Jan 2025 00:00:00 GMT",
+        time_next_visible: "Wed, 01 Jan 2025 00:00:30 GMT",
+        dequeue_count: 1,
+        content: "hello"
+      }
+
+  `:content` is `nil` when the response has no `MessageText` element, and `""`
+  for an empty element. With `:base64`, text that is not valid Base64 returns
+  `{:error, {:invalid_base64, id}}` rather than being returned undecoded.
+  """
 
   import SweetXml
 
@@ -13,6 +39,9 @@ defmodule AzureSDK.Core.Xml.QueueMessages do
   """
   @type encoding :: :base64 | :none
 
+  @typedoc """
+  Parsed queue message fields from a Get/Peek/Put response.
+  """
   @type message :: %{
           id: String.t(),
           pop_receipt: String.t() | nil,
@@ -23,10 +52,34 @@ defmodule AzureSDK.Core.Xml.QueueMessages do
           content: binary() | nil
         }
 
-  @doc false
-  # `content` is `nil` when the response has no MessageText (Put Message), and
-  # `""` for an empty message. With `:base64`, text that is not valid Base64 is
-  # an error rather than being returned undecoded.
+  @doc """
+  Parses a `QueueMessagesList` XML body.
+
+  ## Parameters
+
+  * `xml` - response body
+  * `encoding` - `:base64` (default) or `:none`
+
+  ## Returns
+
+  * `{:ok, [t:message/0]}`
+  * `{:error, :invalid_xml}`
+  * `{:error, {:invalid_base64, message_id}}` when `:base64` decoding fails
+
+  ## Examples
+
+      iex> xml = ~s(<QueueMessagesList><QueueMessage><MessageId>m</MessageId><MessageText>aGVsbG8=</MessageText><DequeueCount>1</DequeueCount></QueueMessage></QueueMessagesList>)
+      iex> {:ok, [%{id: "m", content: "hello", dequeue_count: 1}]} =
+      ...>   AzureSDK.Core.Xml.QueueMessages.parse(xml)
+      iex> true
+      true
+
+      iex> xml = ~s(<QueueMessagesList><QueueMessage><MessageId>m</MessageId><MessageText>hello world</MessageText></QueueMessage></QueueMessagesList>)
+      iex> {:ok, [%{content: "hello world"}]} =
+      ...>   AzureSDK.Core.Xml.QueueMessages.parse(xml, :none)
+      iex> AzureSDK.Core.Xml.QueueMessages.parse(xml, :base64)
+      {:error, {:invalid_base64, "m"}}
+  """
   @spec parse(binary(), encoding()) ::
           {:ok, [message()]} | {:error, :invalid_xml | {:invalid_base64, String.t()}}
   def parse(xml, encoding \\ :base64) when encoding in [:base64, :none] do
@@ -35,7 +88,28 @@ defmodule AzureSDK.Core.Xml.QueueMessages do
     end
   end
 
-  @doc false
+  @doc """
+  Builds a Put/Update Message XML body.
+
+  ## Parameters
+
+  * `content` - message text as a binary
+  * `encoding` - `:base64` (default) or `:none`
+
+  ## Returns
+
+  An XML document string with a single `QueueMessage` / `MessageText` element.
+
+  ## Examples
+
+      iex> body = AzureSDK.Core.Xml.QueueMessages.encode_put("hello")
+      iex> String.contains?(body, "<MessageText>aGVsbG8=</MessageText>")
+      true
+
+      iex> body = AzureSDK.Core.Xml.QueueMessages.encode_put("a & b", :none)
+      iex> String.contains?(body, "<MessageText>a &amp; b</MessageText>")
+      true
+  """
   # Dialyzer's success typing is a binary pattern literal; keep the public contract.
   @dialyzer {:nowarn_function, encode_put: 1, encode_put: 2}
   @spec encode_put(binary(), encoding()) :: binary()

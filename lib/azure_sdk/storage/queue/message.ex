@@ -2,6 +2,9 @@ defmodule AzureSDK.Storage.Queue.Message do
   @moduledoc """
   Azure Queue Storage message operations.
 
+  Use a client with `service: :queue` (or a Queue Azurite endpoint). Queue
+  lifecycle APIs live in `AzureSDK.Storage.Queue`.
+
   ## Message encoding
 
   The service stores message text as-is; whether that text is Base64 is a
@@ -21,17 +24,18 @@ defmodule AzureSDK.Storage.Queue.Message do
   ## Message map (`t:message/0`)
 
       %{
-        id: "...",
-        pop_receipt: "...",
-        insertion_time: "...",
-        expiration_time: "...",
-        time_next_visible: "...",
+        id: "a1b2c3…",
+        pop_receipt: "AgAAAAMAAAAAAAAA…",
+        insertion_time: "Wed, 01 Jan 2025 00:00:00 GMT",
+        expiration_time: "Wed, 08 Jan 2025 00:00:00 GMT",
+        time_next_visible: "Wed, 01 Jan 2025 00:00:30 GMT",
         dequeue_count: 1,
         content: "hello"
       }
 
-  `content` is `nil` when the response carries no message text (Put Message,
+  `:content` is `nil` when the response carries no message text (Put Message,
   and Update Message without `:content`), and `""` for an empty message.
+  After `peek/3`, `:pop_receipt` and `:time_next_visible` are typically `nil`.
 
   ## Limits
 
@@ -46,6 +50,13 @@ defmodule AzureSDK.Storage.Queue.Message do
   so ambiguous 5xx and transport failures are not retried: Put would enqueue a
   duplicate, Get has visibility side effects, and a successful Update issues a
   new pop receipt that a retry would not know. Peek and Delete are retried.
+
+  ## Errors
+
+  Validation failures return `{:error, %AzureSDK.Error{code: "InvalidArgument"}}`
+  (or `"InvalidMessageEncoding"` / `"InvalidResponse"`) without calling the
+  network when possible. Service failures return `{:error, %AzureSDK.Error{}}`
+  with `service: :queue`. This module does not raise.
   """
 
   alias AzureSDK.Core.Telemetry
@@ -57,7 +68,14 @@ defmodule AzureSDK.Storage.Queue.Message do
   @max_visibility 604_800
 
   @typedoc """
-  Queue message result map.
+  Queue message.
+
+  * `:id` - message id assigned by the service
+  * `:pop_receipt` - receipt for `update/4` and `delete/4`; often `nil` after peek
+  * `:insertion_time` / `:expiration_time` / `:time_next_visible` - RFC 1123
+    strings when present, otherwise `nil`
+  * `:dequeue_count` - times dequeued; `nil` after put/update responses that omit it
+  * `:content` - decoded body; `nil` when the service returned no message text
   """
   @type message :: %{
           id: String.t(),
@@ -74,30 +92,48 @@ defmodule AzureSDK.Storage.Queue.Message do
 
   ## Parameters
 
-  * `client` - queue `Storage.Client`
+  * `client` - queue `AzureSDK.Storage.Client`
   * `queue` - queue name
   * `content` - binary or iodata body
-  * `opts` - optional keyword list
+  * `opts` - optional keyword list (default `[]`)
 
   ## Options
 
   * `:message_encoding` - `:base64` (default) or `:none`; see the module docs
   * `:visibility_timeout` - seconds (`0..604_800`) before the message becomes visible
-  * `:message_ttl` - seconds until the message expires (`-1` for no expiry)
+  * `:message_ttl` - seconds until the message expires (`-1` for no expiry, or a
+    positive integer)
 
-  Returns the new message's id, pop receipt and times; `:content` is `nil`
-  because the service does not echo it.
+  ## Returns
+
+  * `{:ok, t:message/0}` - id, pop receipt and times; `:content` is `nil`
+    because the service does not echo it
+  * `{:error, %AzureSDK.Error{}}` - validation (`InvalidArgument`), empty Put
+    response (`InvalidResponse`), or a service error
+
+  Put Message is not idempotent under retries: a retried request may enqueue a
+  duplicate.
 
   ## Examples
 
-      {:ok, %{id: id}} = AzureSDK.Storage.Queue.Message.put(client, "jobs", "hello")
+      iex> match?(
+      ...>   {:error, %{code: "InvalidArgument"}},
+      ...>   AzureSDK.Storage.Queue.Message.put(%AzureSDK.Storage.Client{}, "jobs", "hello",
+      ...>     visibility_timeout: -1
+      ...>   )
+      ...> )
+      true
 
-      {:ok, message} =
-        AzureSDK.Storage.Queue.Message.put(client, "jobs", ~s({"job": 1}),
-          message_encoding: :none,
-          visibility_timeout: 0,
-          message_ttl: 3600
-        )
+      # With a real client:
+      # {:ok, %{id: id, pop_receipt: receipt, content: nil}} =
+      #   AzureSDK.Storage.Queue.Message.put(client, "jobs", "hello")
+      #
+      # {:ok, message} =
+      #   AzureSDK.Storage.Queue.Message.put(client, "jobs", ~s({"job": 1}),
+      #     message_encoding: :none,
+      #     visibility_timeout: 0,
+      #     message_ttl: 3600
+      #   )
   """
   @spec put(Client.t(), String.t(), iodata(), keyword()) ::
           {:ok, message()} | {:error, Error.t()}
@@ -136,21 +172,44 @@ defmodule AzureSDK.Storage.Queue.Message do
   @doc """
   Dequeues messages (makes them invisible for the visibility timeout).
 
+  ## Parameters
+
+  * `client` - queue `Storage.Client`
+  * `queue` - queue name
+  * `opts` - optional keyword list (default `[]`)
+
   ## Options
 
   * `:number_of_messages` - `1..32` (default `1`)
   * `:visibility_timeout` - seconds (`1..604_800`) the messages stay invisible
   * `:message_encoding` - `:base64` (default) or `:none`
 
+  ## Returns
+
+  * `{:ok, [t:message/0]}` - possibly empty when the queue has no visible messages
+  * `{:error, %AzureSDK.Error{}}` - validation, encoding, or service error
+
+  Get Messages is not idempotent under retries: a retry may dequeue additional
+  copies while earlier ones remain invisible.
+
   ## Examples
 
-      {:ok, [msg]} = AzureSDK.Storage.Queue.Message.get(client, "jobs")
+      iex> match?(
+      ...>   {:error, %{code: "InvalidArgument"}},
+      ...>   AzureSDK.Storage.Queue.Message.get(%AzureSDK.Storage.Client{}, "jobs",
+      ...>     number_of_messages: 33
+      ...>   )
+      ...> )
+      true
 
-      {:ok, messages} =
-        AzureSDK.Storage.Queue.Message.get(client, "jobs",
-          number_of_messages: 5,
-          visibility_timeout: 30
-        )
+      # With a real client:
+      # {:ok, [msg]} = AzureSDK.Storage.Queue.Message.get(client, "jobs")
+      #
+      # {:ok, messages} =
+      #   AzureSDK.Storage.Queue.Message.get(client, "jobs",
+      #     number_of_messages: 5,
+      #     visibility_timeout: 30
+      #   )
   """
   @spec get(Client.t(), String.t(), keyword()) ::
           {:ok, [message()]} | {:error, Error.t()}
@@ -181,14 +240,36 @@ defmodule AzureSDK.Storage.Queue.Message do
   @doc """
   Peeks messages without changing visibility.
 
+  Peeked messages have no usable pop receipt for `delete/4` or `update/4`.
+
+  ## Parameters
+
+  * `client` - queue `Storage.Client`
+  * `queue` - queue name
+  * `opts` - optional keyword list (default `[]`)
+
   ## Options
 
   * `:number_of_messages` - `1..32` (default `1`)
   * `:message_encoding` - `:base64` (default) or `:none`
 
+  ## Returns
+
+  * `{:ok, [t:message/0]}` - typically with `pop_receipt: nil`
+  * `{:error, %AzureSDK.Error{}}`
+
   ## Examples
 
-      {:ok, [msg]} = AzureSDK.Storage.Queue.Message.peek(client, "jobs")
+      iex> match?(
+      ...>   {:error, %{code: "InvalidArgument"}},
+      ...>   AzureSDK.Storage.Queue.Message.peek(%AzureSDK.Storage.Client{}, "jobs",
+      ...>     number_of_messages: 0
+      ...>   )
+      ...> )
+      true
+
+      # With a real client:
+      # {:ok, [msg]} = AzureSDK.Storage.Queue.Message.peek(client, "jobs")
   """
   @spec peek(Client.t(), String.t(), keyword()) ::
           {:ok, [message()]} | {:error, Error.t()}
@@ -220,16 +301,36 @@ defmodule AzureSDK.Storage.Queue.Message do
   whose response was lost, or it expired. A stale pop receipt still returns
   `{:error, %AzureSDK.Error{status: 400, code: "PopReceiptMismatch"}}`.
 
+  ## Parameters
+
+  * `client` - queue `Storage.Client`
+  * `queue` - queue name
+  * `message_id` - `:id` from `get/3` or `put/4`
+  * `opts` - keyword list
+
   ## Options
 
-  * `:pop_receipt` (required)
+  * `:pop_receipt` (required) - `:pop_receipt` from `get/3`, `put/4`, or `update/4`
+
+  ## Returns
+
+  * `{:ok, :deleted}` - including when the service reports `MessageNotFound`
+  * `{:error, %AzureSDK.Error{}}` - missing `:pop_receipt`, stale receipt, or
+    other service errors
 
   ## Examples
 
-      {:ok, :deleted} =
-        AzureSDK.Storage.Queue.Message.delete(client, "jobs", message.id,
-          pop_receipt: message.pop_receipt
-        )
+      iex> match?(
+      ...>   {:error, %{code: "InvalidArgument"}},
+      ...>   AzureSDK.Storage.Queue.Message.delete(%AzureSDK.Storage.Client{}, "jobs", "msg-1")
+      ...> )
+      true
+
+      # With a real client:
+      # {:ok, :deleted} =
+      #   AzureSDK.Storage.Queue.Message.delete(client, "jobs", message.id,
+      #     pop_receipt: message.pop_receipt
+      #   )
   """
   @spec delete(Client.t(), String.t(), String.t(), keyword()) ::
           {:ok, :deleted} | {:error, Error.t()}
@@ -254,8 +355,16 @@ defmodule AzureSDK.Storage.Queue.Message do
   @doc """
   Updates a message's visibility timeout and optionally its content.
 
-  Without `:content`, only the visibility timeout changes and the message body
-  is kept. Not retried by the pipeline (see the module docs).
+  Without `:content` (or with `content: nil`), only the visibility timeout
+  changes and the message body is kept: the request is sent with an empty body
+  (`Content-Length: 0`). Not retried by the pipeline (see the module docs).
+
+  ## Parameters
+
+  * `client` - queue `Storage.Client`
+  * `queue` - queue name
+  * `message_id` - message id
+  * `opts` - keyword list
 
   ## Options
 
@@ -264,23 +373,39 @@ defmodule AzureSDK.Storage.Queue.Message do
   * `:content` - new body (iodata); omit to keep the current body
   * `:message_encoding` - `:base64` (default) or `:none`, for `:content`
 
-  Returns the message id, the new pop receipt and next-visible time. `:content`
-  is the new body when given, otherwise `nil`.
+  ## Returns
+
+  * `{:ok, t:message/0}` - id, the new pop receipt and next-visible time;
+    `:content` is the new body when given, otherwise `nil`
+  * `{:error, %AzureSDK.Error{}}` - missing required opts, validation, stale
+    receipt, or other service errors
+
+  Update Message is not idempotent under retries.
 
   ## Examples
 
-      {:ok, updated} =
-        AzureSDK.Storage.Queue.Message.update(client, "jobs", message.id,
-          pop_receipt: message.pop_receipt,
-          visibility_timeout: 60
-        )
+      iex> match?(
+      ...>   {:error, %{code: "InvalidArgument"}},
+      ...>   AzureSDK.Storage.Queue.Message.update(%AzureSDK.Storage.Client{}, "jobs", "msg-1",
+      ...>     pop_receipt: "pr",
+      ...>     visibility_timeout: -1
+      ...>   )
+      ...> )
+      true
 
-      {:ok, updated} =
-        AzureSDK.Storage.Queue.Message.update(client, "jobs", message.id,
-          pop_receipt: message.pop_receipt,
-          visibility_timeout: 0,
-          content: "retry later"
-        )
+      # With a real client:
+      # {:ok, updated} =
+      #   AzureSDK.Storage.Queue.Message.update(client, "jobs", message.id,
+      #     pop_receipt: message.pop_receipt,
+      #     visibility_timeout: 60
+      #   )
+      #
+      # {:ok, updated} =
+      #   AzureSDK.Storage.Queue.Message.update(client, "jobs", message.id,
+      #     pop_receipt: message.pop_receipt,
+      #     visibility_timeout: 0,
+      #     content: "retry later"
+      #   )
   """
   @spec update(Client.t(), String.t(), String.t(), keyword()) ::
           {:ok, message()} | {:error, Error.t()}
