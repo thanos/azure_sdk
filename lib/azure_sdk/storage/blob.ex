@@ -5,7 +5,7 @@ defmodule AzureSDK.Storage.Blob do
   `upload/5` uses a single Put Blob. `upload_stream/5` stages blocks with Put
   Block / Put Block List so only one chunk is held in memory at a time.
   `download_stream/4` fetches the blob with HTTP Range requests, pinned to the
-  ETag the blob had when the stream started.
+  ETag from an initial `properties/4` HEAD.
 
   ## Blob map (`t:blob/0`)
 
@@ -21,6 +21,31 @@ defmodule AzureSDK.Storage.Blob do
         metadata: %{"owner" => "app"},
         content: "hello"
       }
+
+  ## Properties map (`t:properties/0`)
+
+  Returned by `properties/4` (Blob HEAD; no body download):
+
+      %{
+        content_length: 1024,
+        content_type: "application/octet-stream",
+        etag: "\\"0x8D…\\"",
+        last_modified: "Wed, 01 Jan 2025 00:00:00 GMT",
+        metadata: %{"owner" => "app"}
+      }
+
+  Typical ETag-guarded range read:
+
+      {:ok, props} = AzureSDK.Storage.Blob.properties(client, container, blob)
+
+      {:ok, %{content: bytes}} =
+        AzureSDK.Storage.Blob.download(
+          client,
+          container,
+          blob,
+          range: {offset, offset + length - 1},
+          if_match: props.etag
+        )
 
   ## Errors
 
@@ -58,6 +83,23 @@ defmodule AzureSDK.Storage.Blob do
           properties: map(),
           metadata: map(),
           content: binary() | nil
+        }
+
+  @typedoc """
+  Blob properties from `properties/4` (HEAD / Get Blob Properties).
+
+  * `:content_length` - size in bytes (integer)
+  * `:content_type` - content type when the service returns it
+  * `:etag` - ETag exactly as Azure returns it
+  * `:last_modified` - RFC 1123 last-modified when present
+  * `:metadata` - user metadata without the `x-ms-meta-` prefix
+  """
+  @type properties :: %{
+          content_length: non_neg_integer(),
+          content_type: String.t() | nil,
+          etag: String.t() | nil,
+          last_modified: String.t() | nil,
+          metadata: map()
         }
 
   @doc """
@@ -254,14 +296,15 @@ defmodule AzureSDK.Storage.Blob do
   * condition / lease opts from `AzureSDK.Storage.Conditions` (applied to the
     initial HEAD and to each range GET)
 
-  The stream reads the blob's size and ETag once, then sends `If-Match` with
-  that ETag on every range (unless you pass `:if_match` yourself). If the blob
-  is overwritten while you enumerate, the next range fails with 412 instead of
-  returning bytes from the new version. The `:range` and `:include_content`
-  options of `download/4` are ignored here.
+  The stream calls `properties/4` once for size and ETag, then sends `If-Match`
+  with that ETag on every range (unless you pass `:if_match` yourself). If the
+  blob is overwritten while you enumerate, the next range fails with 412
+  instead of returning bytes from the new version. The `:range` and
+  `:include_content` options of `download/4` are ignored here.
 
   Mid-stream HTTP failures, including that 412, raise
-  `AzureSDK.Storage.Blob.StreamError`.
+  `AzureSDK.Storage.Blob.StreamError`. A failed initial HEAD is returned as
+  `{:error, %AzureSDK.Error{}}` before a stream is built.
 
   ## Examples
 
@@ -279,11 +322,11 @@ defmodule AzureSDK.Storage.Blob do
     chunk_size = Keyword.get(opts, :chunk_size, @default_chunk_size)
     opts = Keyword.drop(opts, [:range, :include_content])
 
-    case blob_properties(client, container, name, opts) do
-      {:ok, 0, _etag} ->
+    case properties(client, container, name, opts) do
+      {:ok, %{content_length: 0}} ->
         {:ok, []}
 
-      {:ok, size, etag} ->
+      {:ok, %{content_length: size, etag: etag}} ->
         range_opts = if etag, do: Keyword.put_new(opts, :if_match, etag), else: opts
         {:ok, range_stream(client, container, name, range_opts, chunk_size, size)}
 
@@ -309,6 +352,94 @@ defmodule AzureSDK.Storage.Blob do
       end,
       fn _ -> :ok end
     )
+  end
+
+  @doc """
+  Returns blob properties via HEAD (Get Blob Properties). Does not download the body.
+
+  ## Parameters
+
+  * `client`, `container`, `name` - as in `upload/5`
+  * `opts` - optional keyword list (default `[]`)
+
+  ## Options
+
+  * condition / lease opts from `AzureSDK.Storage.Conditions`
+
+  ## Returns
+
+  * `{:ok, t:properties/0}` - `content_length` is an integer
+  * `{:error, %AzureSDK.Error{}}` - including `InvalidResponse` when length
+    headers are missing or malformed
+
+  ## Examples
+
+      {:ok, %{content_length: size, etag: etag}} =
+        AzureSDK.Storage.Blob.properties(client, "uploads", "hello.txt")
+
+      {:ok, props} =
+        AzureSDK.Storage.Blob.properties(client, "uploads", "hello.txt",
+          lease_id: lease_id,
+          if_match: etag
+        )
+  """
+  @spec properties(Client.t(), String.t(), String.t(), keyword()) ::
+          {:ok, properties()} | {:error, AzureSDK.Error.t()}
+  def properties(client, container, name, opts \\ []) do
+    Telemetry.emit_operation(:blob, :properties, %{container: container, name: name})
+
+    with {:ok, response} <- head_blob(client, container, name, opts, :properties),
+         {:ok, content_length} <- parse_size(response) do
+      {:ok,
+       %{
+         content_length: content_length,
+         content_type: Operation.header(response, "content-type"),
+         etag: Operation.header(response, "etag"),
+         last_modified: Operation.header(response, "last-modified"),
+         metadata: Metadata.from_headers(response.headers)
+       }}
+    end
+  end
+
+  @doc """
+  Returns whether the blob exists.
+
+  ## Parameters
+
+  * `client`, `container`, `name` - as in `upload/5`
+  * `opts` - optional keyword list (default `[]`)
+
+  ## Options
+
+  * condition / lease opts from `AzureSDK.Storage.Conditions`
+
+  ## Returns
+
+  * `true` / `false` when the service answers or reports not found
+  * `{:error, %AzureSDK.Error{}}` for other failures (auth, 403, 5xx, transport)
+
+  Match all three; do not treat the return as a plain boolean. Uses the same
+  HEAD request path as `properties/4`; never downloads the body.
+
+  ## Examples
+
+      case AzureSDK.Storage.Blob.exists?(client, "uploads", "hello.txt") do
+        true -> :ok
+        false -> AzureSDK.Storage.Blob.upload(client, "uploads", "hello.txt", "")
+        {:error, error} -> {:error, error}
+      end
+  """
+  @spec exists?(Client.t(), String.t(), String.t(), keyword()) ::
+          boolean() | {:error, AzureSDK.Error.t()}
+  def exists?(client, container, name, opts \\ []) do
+    Telemetry.emit_operation(:blob, :exists, %{container: container, name: name})
+
+    case head_blob(client, container, name, opts, :exists) do
+      {:ok, _} -> true
+      {:error, %{status: 404}} -> false
+      {:error, %{code: "BlobNotFound"}} -> false
+      {:error, _} = error -> error
+    end
   end
 
   @doc """
@@ -374,13 +505,7 @@ defmodule AzureSDK.Storage.Blob do
   def metadata(client, container, name, opts \\ []) do
     Telemetry.emit_operation(:blob, :metadata, %{container: container, name: name})
 
-    with {:ok, response} <-
-           Operation.run(client,
-             method: :head,
-             path: Operation.blob_path(container, name),
-             headers: Conditions.headers(opts),
-             operation: :metadata
-           ) do
+    with {:ok, response} <- head_blob(client, container, name, opts, :metadata) do
       {:ok, Metadata.from_headers(response.headers)}
     end
   end
@@ -516,19 +641,13 @@ defmodule AzureSDK.Storage.Blob do
     %{"Range" => "bytes=#{start}-#{finish}"}
   end
 
-  defp blob_properties(client, container, name, opts) do
-    with {:ok, response} <-
-           Operation.run(client,
-             method: :head,
-             path: Operation.blob_path(container, name),
-             headers: Conditions.headers(opts),
-             operation: :blob_size
-           ) do
-      case parse_size(response) do
-        {:ok, size} -> {:ok, size, Operation.header(response, "etag")}
-        :error -> {:error, invalid_size(response)}
-      end
-    end
+  defp head_blob(client, container, name, opts, operation) do
+    Operation.run(client,
+      method: :head,
+      path: Operation.blob_path(container, name),
+      headers: Conditions.headers(opts),
+      operation: operation
+    )
   end
 
   defp parse_size(response) do
@@ -537,18 +656,18 @@ defmodule AzureSDK.Storage.Blob do
         Operation.header(response, "content-length")
 
     case value && Integer.parse(value) do
-      {size, ""} when size >= 0 -> {:ok, size}
-      _ -> :error
-    end
-  end
+      {size, ""} when size >= 0 ->
+        {:ok, size}
 
-  defp invalid_size(response) do
-    Error.new(
-      code: "InvalidResponse",
-      message: "Blob properties response has no valid Content-Length",
-      status: response.status,
-      service: :blob
-    )
+      _ ->
+        {:error,
+         Error.new(
+           code: "InvalidResponse",
+           message: "Blob properties response has no valid Content-Length",
+           status: response.status,
+           service: :blob
+         )}
+    end
   end
 
   defp blob_from_response(container, name, %Response{} = response, content, opts) do

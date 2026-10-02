@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.4.1 - 2026-10-01
+
+### Added
+
+- `AzureSDK.Storage.Blob.properties/4` — Blob HEAD / Get Blob Properties
+  (`content_length` as integer, content type, ETag, last-modified, user metadata)
+- `AzureSDK.Storage.Blob.exists?/4` — three-way `true` / `false` /
+  `{:error, %AzureSDK.Error{}}` (only not-found maps to `false`)
+
+### Changed
+
+- `Blob.download_stream/4` uses `properties/4` for the initial size/ETag HEAD
+  (no intended behavioral change)
+
 ## v0.4.0 - 2026-10-01
 
 ### Added

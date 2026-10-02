@@ -9,7 +9,7 @@
 - `%AzureSDK.Error{}` everywhere
 - Req/Finch instead of HTTPoison
 - Azurite-first CI
-- Explicit credentials; Entra / OAuth (v0.2.0+); Blob streams and SAS (v0.3.0); Queue Storage (v0.4.0)
+- Explicit credentials; Entra / OAuth (v0.2.0+); Blob streams and SAS (v0.3.0); Queue Storage (v0.4.0); Blob properties / exists? (v0.4.1)
 
 See [`plans/azurex-review.md`](https://github.com/thanos/azure_sdk/blob/main/plans/azurex-review.md) for details.
 
@@ -18,7 +18,7 @@ See [`plans/azurex-review.md`](https://github.com/thanos/azure_sdk/blob/main/pla
 ```elixir
 # Remove: {:azurex, "~> 1.1"}
 # Add:
-{:azure_sdk, "~> 0.4.0"}
+{:azure_sdk, "~> 0.4.1"}
 ```
 
 ## Client Setup
@@ -48,6 +48,8 @@ Create client once at startup; pass to all operations.
 | `list_containers/1` | `Container.list/1` (also `list_page/2`, `list_stream/2`) |
 | streaming upload | `Blob.upload_stream/5` (Put Block / Put Block List) |
 | streaming download | `Blob.download_stream/4` (HTTP Range) |
+| blob HEAD / size / ETag | `Blob.properties/4` |
+| blob exists? | `Blob.exists?/4` (match `true` / `false` / `{:error, _}`) |
 | SAS generation | `AzureSDK.Storage.Sas` |
 | leases / conditions | `Blob.Lease`, `Storage.Conditions` |
 | Queue CRUD / messages | `AzureSDK.Storage.Queue`, `Queue.Message` |

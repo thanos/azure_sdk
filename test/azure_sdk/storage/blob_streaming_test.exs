@@ -216,5 +216,47 @@ defmodule AzureSDK.Storage.BlobStreamingTest do
       assert {:error, %Error{code: "InvalidResponse"}} =
                Blob.download_stream(client, "uploads", "odd.txt")
     end
+
+    test "returns HEAD failure before a stream is constructed", %{
+      bypass: bypass,
+      client: client,
+      account: account
+    } do
+      AzureMock.stub_error(
+        bypass,
+        "HEAD",
+        AzureMock.path(["uploads", "missing.txt"], account),
+        404,
+        "BlobNotFound",
+        "gone"
+      )
+
+      assert {:error, %{status: 404}} =
+               Blob.download_stream(client, "uploads", "missing.txt")
+    end
+
+    test "performs a single initial HEAD before range GETs", %{bypass: bypass, client: client} do
+      {:ok, heads} = Agent.start_link(fn -> 0 end)
+      test_pid = self()
+
+      Bypass.expect(bypass, "HEAD", AzureMock.path(["uploads", "once.txt"]), fn conn ->
+        Agent.update(heads, &(&1 + 1))
+
+        conn
+        |> Plug.Conn.put_resp_header("x-ms-blob-content-length", "4")
+        |> Plug.Conn.put_resp_header("etag", "\"0x2\"")
+        |> Plug.Conn.resp(200, "")
+      end)
+
+      Bypass.expect(bypass, "GET", AzureMock.path(["uploads", "once.txt"]), fn conn ->
+        send(test_pid, :range_get)
+        Plug.Conn.resp(conn, 206, "abcd")
+      end)
+
+      assert {:ok, stream} = Blob.download_stream(client, "uploads", "once.txt", chunk_size: 4)
+      assert Enum.join(stream) == "abcd"
+      assert Agent.get(heads, & &1) == 1
+      assert_received :range_get
+    end
   end
 end
