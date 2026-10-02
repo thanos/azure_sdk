@@ -4,7 +4,7 @@
 
 ## Summary
 
-| Dimension | Azurex | AzureSDK v0.4.0 |
+| Dimension | Azurex | AzureSDK v0.4.1 |
 |-----------|--------|-----------------|
 | Scope | Primarily Blob Storage | Platform SDK (Blob + Queue; Table/Mgmt later) |
 | HTTP client | HTTPoison / Hackney | Req → Finch → Mint |

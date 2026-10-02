@@ -2,8 +2,8 @@ defmodule AzureSDK do
   @moduledoc """
   AzureSDK is a long-term Azure platform SDK for Elixir and Erlang.
 
-  v0.4.0 adds Azure Queue Storage on top of the v0.3.0 Blob and v0.2.0 identity
-  foundations.
+  v0.4.1 adds Blob `properties/4` and `exists?/4` on top of v0.4.0 Queue Storage,
+  v0.3.0 Blob streams, and v0.2.0 identity foundations.
 
   ## Quick start
 
@@ -39,7 +39,7 @@ defmodule AzureSDK do
 
   ## Returns
 
-  Version string from the application spec (for example `"0.4.0"`).
+  Version string from the application spec (for example `"0.4.1"`).
 
   ## Examples
 

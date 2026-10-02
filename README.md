@@ -10,7 +10,10 @@ Azure platform SDK for Elixir and Erlang.
 
 AzureSDK is not a Blob Storage library. It is a long-term, multi-service Azure SDK built on BEAM-native patterns: explicit client structs, OTP-ready design, first-class telemetry, and a reusable Req pipeline.
 
-**v0.4.0** adds Azure Queue Storage: queue CRUD, message put/get/peek/delete/update, explicit Base64 or plain-text message encoding, and no automatic retry for the message operations that are unsafe to repeat. Table, Management, and BEAM integrations follow later (see Roadmap).
+**v0.4.1** adds public Blob `properties/4` and `exists?/4` (HEAD) so callers can
+read size and ETag without downloading, and compose ETag-guarded range reads.
+Queue Storage landed in v0.4.0. Table, Management, and BEAM integrations follow
+later (see Roadmap).
 
 See [CHANGELOG](CHANGELOG.md) for migration notes. Identity guide: [`guides/azure_identity.md`](guides/azure_identity.md).
 
@@ -19,7 +22,7 @@ See [CHANGELOG](CHANGELOG.md) for migration notes. Identity guide: [`guides/azur
 ```elixir
 def deps do
   [
-    {:azure_sdk, "~> 0.4.0"}
+    {:azure_sdk, "~> 0.4.1"}
   ]
 end
 ```
@@ -85,6 +88,27 @@ shared with the v12 Python or .NET SDKs, which send plain text by default, pass
 {:ok, chunks} = AzureSDK.Storage.Blob.download_stream(client, "uploads", "large.bin")
 ```
 
+### Blob properties and range reads
+
+```elixir
+{:ok, props} = AzureSDK.Storage.Blob.properties(client, "uploads", "large.bin")
+
+{:ok, %{content: bytes}} =
+  AzureSDK.Storage.Blob.download(
+    client,
+    "uploads",
+    "large.bin",
+    range: {0, min(1023, props.content_length - 1)},
+    if_match: props.etag
+  )
+
+case AzureSDK.Storage.Blob.exists?(client, "uploads", "large.bin") do
+  true -> :ok
+  false -> :missing
+  {:error, error} -> {:error, error}
+end
+```
+
 ### Local development with Azurite
 
 ```bash
@@ -132,11 +156,18 @@ v0.1.0 established the platform foundation. Releases after v0.2.0 deepen Storage
 | **v0.2.0** | Identity + Core Contracts | TokenCredential, Entra credentials, TokenCache, Bearer, retry hardening, ServiceVersion |
 | **v0.3.0** | Production Blob | Real streaming, block blobs, conditions, lazy pagination, SAS generation |
 | **v0.4.0** | Queue Storage | Queue CRUD, messages, safe retry semantics |
+| **v0.4.1** | Blob properties | `Blob.properties/4`, `Blob.exists?/4` (HEAD) |
 | **v0.5.0** | Table Storage | Entities, OData queries, batch, Table signing |
 | **v0.6.0** | Management Plane | ARM client, LRO, StorageAccount |
 | **v0.7.0** | BEAM Integrations | Broadway, Flow (use-case driven) |
 
-### v0.4.0 - Queue Storage (Current)
+### v0.4.1 - Blob properties (Current)
+
+- `Blob.properties/4` — size, ETag, content type, last-modified, metadata (HEAD)
+- `Blob.exists?/4` — `true` / `false` / `{:error, _}`
+- `download_stream/4` reuses `properties/4` for the initial HEAD
+
+### v0.4.0 - Queue Storage
 
 - Queue create / delete / exists / metadata / clear
 - Lazy and eager listing (`list_page` / `list_stream`)

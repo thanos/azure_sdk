@@ -186,13 +186,27 @@ defmodule AzureSDK.AzureMock do
     Enum.map_join(ids, &Map.fetch!(blocks, &1))
   end
 
-  def stub_head_blob_size(bypass, container, blob, size) do
+  def stub_head_blob_size(bypass, container, blob, size, opts \\ []) do
     Bypass.expect(bypass, "HEAD", path([container, blob]), fn conn ->
-      conn
-      |> Plug.Conn.put_resp_header("x-ms-blob-content-length", Integer.to_string(size))
-      |> Plug.Conn.put_resp_header("content-length", Integer.to_string(size))
-      |> Plug.Conn.put_resp_header("etag", "\"0x2\"")
-      |> Plug.Conn.resp(200, "")
+      metadata = Keyword.get(opts, :metadata, %{})
+      content_type = Keyword.get(opts, :content_type, "application/octet-stream")
+      last_modified = Keyword.get(opts, :last_modified, "Wed, 01 Jan 2025 00:00:00 GMT")
+      etag = Keyword.get(opts, :etag, "\"0x2\"")
+
+      conn =
+        conn
+        |> Plug.Conn.put_resp_header("x-ms-blob-content-length", Integer.to_string(size))
+        |> Plug.Conn.put_resp_header("content-length", Integer.to_string(size))
+        |> Plug.Conn.put_resp_header("content-type", content_type)
+        |> Plug.Conn.put_resp_header("last-modified", last_modified)
+        |> Plug.Conn.put_resp_header("etag", etag)
+
+      conn =
+        Enum.reduce(metadata, conn, fn {k, v}, acc ->
+          Plug.Conn.put_resp_header(acc, "x-ms-meta-#{k}", v)
+        end)
+
+      Plug.Conn.resp(conn, 200, "")
     end)
   end
 

@@ -46,6 +46,8 @@ Before backoff sleep: `%{count: 1, delay_ms: int}`, metadata includes `attempt`.
 | `[:azure_sdk, :blob, :put_block_list]` | `Blob.Block.put_block_list/5` | `container`, `name`, `block_count` |
 | `[:azure_sdk, :blob, :lease_*]` | `Blob.Lease.*` | `container`, `name` |
 | `[:azure_sdk, :blob, :get]` | `download/4` | `container`, `name` |
+| `[:azure_sdk, :blob, :properties]` | `properties/4` | `container`, `name` |
+| `[:azure_sdk, :blob, :exists]` | `exists?/4` | `container`, `name` |
 | `[:azure_sdk, :blob, :delete]` | `delete/3` | `container`, `name` |
 | `[:azure_sdk, :blob, :metadata]` | `metadata/3` | `container`, `name` |
 | `[:azure_sdk, :blob, :set_metadata]` | `set_metadata/4` | `container`, `name` |

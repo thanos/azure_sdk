@@ -35,6 +35,33 @@ defmodule AzureSDK.Storage.StreamingAzuriteTest do
     assert Enum.join(dl) == content
   end
 
+  test "properties and exists? against a real blob", %{client: client, container: container} do
+    assert {:ok, _} =
+             Blob.upload(client, container, "props.txt", "hello",
+               content_type: "text/plain",
+               metadata: %{"owner" => "azurite"}
+             )
+
+    assert {:ok,
+            %{
+              content_length: 5,
+              content_type: content_type,
+              etag: etag,
+              metadata: %{"owner" => "azurite"}
+            }} = Blob.properties(client, container, "props.txt")
+
+    assert is_binary(etag) and etag != ""
+    assert content_type in ["text/plain", "application/octet-stream"] or is_binary(content_type)
+    assert true == Blob.exists?(client, container, "props.txt")
+    assert false == Blob.exists?(client, container, "missing-props.txt")
+
+    assert {:ok, %{content: "ell"}} =
+             Blob.download(client, container, "props.txt", range: {1, 3}, if_match: etag)
+
+    assert {:ok, stream} = Blob.download_stream(client, container, "props.txt", chunk_size: 2)
+    assert Enum.join(stream) == "hello"
+  end
+
   test "lease acquire and delete with lease id", %{client: client, container: container} do
     assert {:ok, _} = Blob.upload(client, container, "lease.txt", "hi")
 
